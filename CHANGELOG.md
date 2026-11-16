@@ -23,4 +23,5 @@
 
 ## 0.1.0
 
-- The Machines panel: CPU, RAM, disk, load, containers and failed systemd units of SSH servers, every 30 seconds.
+- The first panel, then called Machines: CPU, RAM, disk, load, containers and failed systemd units of SSH servers,
+  every 30 seconds.
