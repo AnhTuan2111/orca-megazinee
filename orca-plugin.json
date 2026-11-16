@@ -2,10 +2,10 @@
   "manifestVersion": 2,
   "id": "machines",
   "name": "Machines",
-  "version": "0.1.0",
-  "description": "CPU, RAM, disk, load and containers of your SSH servers in a sidebar panel.",
+  "version": "0.2.0",
+  "description": "Live CPU, RAM, disk and containers of your SSH servers, with 24 hour disk trends, in a sidebar panel and the status bar.",
   "engines": {
-    "orca": ">=1.4.246"
+    "orca": ">=1.4.248"
   },
   "execution": "trusted-worker",
   "pluginApi": 1,
@@ -23,34 +23,70 @@
     "settings": [
       {
         "key": "hosts",
-        "title": "Máy cần theo dõi",
-        "description": "Mỗi dòng một máy, dạng tên=đích SSH, ví dụ: web-01=ubuntu@10.0.0.1. Máy phải SSH được bằng khoá, không hỏi mật khẩu.",
+        "title": "Machines to watch",
+        "description": "One machine per line as name=ssh-target, for example web-01=ubuntu@10.0.0.1. The machine must accept your SSH key without a password prompt.",
         "type": "string",
         "multiline": true,
         "default": "",
         "placeholder": "web-01=ubuntu@10.0.0.1"
       },
       {
-        "key": "intervalSeconds",
-        "title": "Số giây giữa hai lần lấy số liệu",
+        "key": "sampleSeconds",
+        "title": "Seconds between samples",
+        "description": "Each machine keeps one SSH connection and is sampled again after this many seconds. Docker and systemd are sampled about every 15 seconds.",
         "type": "integer",
-        "default": 30,
-        "minimum": 10,
-        "maximum": 600
+        "default": 2,
+        "minimum": 1,
+        "maximum": 60
+      },
+      {
+        "key": "alerts",
+        "title": "Desktop notifications",
+        "description": "Notify when a machine is offline for 30 seconds, disk or RAM reaches 90%, CPU stays at 90% for a minute, or a container is unhealthy or restarting.",
+        "type": "boolean",
+        "default": true
       },
       {
         "key": "sshCommand",
-        "title": "Đường dẫn chương trình ssh",
-        "description": "Để trống thì dùng ssh của Git for Windows nếu có, không thì dùng ssh trên PATH.",
+        "title": "Path to ssh",
+        "description": "Leave empty to use Git for Windows' ssh when present, else ssh on PATH.",
         "type": "string",
         "default": "",
         "placeholder": "C:/Program Files/Git/usr/bin/ssh.exe"
+      }
+    ],
+    "commands": [
+      {
+        "id": "machines.toggleSidebar",
+        "title": "Machines: toggle the right sidebar",
+        "action": "sidebar.right.toggle"
+      }
+    ],
+    "statusBarItems": [
+      {
+        "id": "machines",
+        "text": "Machines",
+        "icon": "gauge",
+        "tooltip": "No machines yet.",
+        "command": "machines.toggleSidebar"
       }
     ]
   },
   "capabilities": [
     {
       "kind": "settings:own"
+    },
+    {
+      "kind": "storage:own"
+    },
+    {
+      "kind": "notifications:show"
+    },
+    {
+      "kind": "workspace:read"
+    },
+    {
+      "kind": "terminal:send"
     }
   ]
 }
