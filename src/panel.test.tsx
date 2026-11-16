@@ -17,7 +17,7 @@ const hostWith = (machines: Machine[]) =>
         // Orca rejects input with a field set to undefined; the panel must leave the field out.
         assert.ok(!Object.values(input as object).includes(undefined), JSON.stringify(input))
         sent.push(input)
-        return { ok: true, background: false }
+        return { ok: true }
       }
     }
   })

@@ -13,11 +13,19 @@ declare module 'node:child_process' {
     on(event: 'error', listener: (error: Error) => void): void
     on(event: 'close', listener: (code: number | null) => void): void
   }
-  export function spawn(command: string, args: string[], options?: { windowsHide?: boolean }): ChildProcess
+  export function spawn(
+    command: string,
+    args: string[],
+    options?: { windowsHide?: boolean; env?: Record<string, string | undefined> }
+  ): ChildProcess
 }
 
 declare module 'node:fs' {
   export function existsSync(path: string): boolean
+}
+
+declare module 'node:os' {
+  export function homedir(): string
 }
 
 declare const process: { env: Record<string, string | undefined>; platform: string }

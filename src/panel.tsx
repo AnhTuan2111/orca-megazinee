@@ -149,7 +149,7 @@ async function terminal(name: string, kind: 'shell' | 'logs', container?: string
     set(
       notice,
       answer.background
-        ? { tone: 'warning', text: `Started ${what} in the background: the orca CLI was not found, so Orca gave it no tab.` }
+        ? { tone: 'warning', text: `Started ${what} in the background without a tab, because ${answer.background}.` }
         : null
     )
   } catch (e) {

@@ -4,6 +4,7 @@
 // pushed to the panel through machines.update, updates the status bar item, and goes through the alert check.
 import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
+import { homedir } from 'node:os'
 import type { OrcaWorkerApi } from 'orca/worker'
 import { problemsOf, levelOf, type Level } from './health'
 import { asHistory, cpuMinutes, diskHours, diskTrend, emptyHistory, Recorder, type History } from './history'
@@ -47,6 +48,23 @@ const SSH_OPTIONS = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', '-o', 'Ser
 const lastLine = (text: string) => text.trim().split(/\r?\n/).pop() ?? ''
 
 /**
+ * Orca's worker gets a trimmed environment without APPDATA and LOCALAPPDATA, and the orca CLI needs APPDATA to find
+ * the running Orca. Fill them in from the home directory, which Node finds even without the variables.
+ */
+function cliEnv(): Record<string, string | undefined> {
+  const home = homedir()
+  const env = { ...process.env }
+  if (process.platform === 'win32') {
+    env.USERPROFILE = env.USERPROFILE ?? home
+    env.APPDATA = env.APPDATA ?? `${home}\\AppData\\Roaming`
+    env.LOCALAPPDATA = env.LOCALAPPDATA ?? `${home}\\AppData\\Local`
+  } else {
+    env.HOME = env.HOME ?? home
+  }
+  return env
+}
+
+/**
  * The orca CLI. The plugin API's terminal.create only starts a background terminal with no tab, so Shell and Logs
  * use `orca terminal create --focus`, which opens a visible tab and switches to it. ORCA_CLI_COMMAND wins when Orca
  * sets it; on Windows the CLI ships next to Orca; elsewhere it is on PATH.
@@ -55,34 +73,47 @@ function orcaCli(): string | undefined {
   const fromEnv = process.env.ORCA_CLI_COMMAND
   if (fromEnv) return fromEnv
   if (process.platform === 'win32') {
-    const local = process.env.LOCALAPPDATA
-    const exe = local ? `${local}/Programs/orca/resources/bin/orca.exe` : ''
-    return exe && existsSync(exe) ? exe : undefined
+    const local = cliEnv().LOCALAPPDATA
+    const exe = `${local}/Programs/orca/resources/bin/orca.exe`
+    return existsSync(exe) ? exe : undefined
   }
   return process.platform === 'linux' ? 'orca-ide' : 'orca'
 }
 
-/** Opens a visible terminal tab in the active workspace through the orca CLI; false when the CLI is missing or fails. */
-function openTab(title: string, command: string): Promise<boolean> {
+/**
+ * Opens a visible terminal tab in the active workspace through the orca CLI. Resolves with null on success, or the
+ * reason it failed. The CLI can exit 0 and still fail, so the answer is read from its JSON `ok` field.
+ */
+function openTab(title: string, command: string): Promise<string | null> {
   const cli = orcaCli()
-  if (!cli) return Promise.resolve(false)
+  if (!cli) return Promise.resolve('the orca CLI was not found')
   return new Promise((resolve) => {
     const child = spawn(cli, ['terminal', 'create', '--worktree', 'active', '--title', title, '--command', command, '--focus', '--json'], {
-      windowsHide: true
+      windowsHide: true,
+      env: cliEnv()
     })
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    let out = ''
+    let err = ''
     const timer = setTimeout(() => {
       child.kill()
-      resolve(false)
+      resolve('the orca CLI did not answer within 15 seconds')
     }, 15_000)
-    child.stdout.on('data', () => {})
-    child.stderr.on('data', () => {})
-    child.on('error', () => {
+    child.stdout.on('data', (d) => (out += d))
+    child.stderr.on('data', (d) => (err += d))
+    child.on('error', (e) => {
       clearTimeout(timer)
-      resolve(false)
+      resolve(e.message)
     })
-    child.on('close', (code) => {
+    child.on('close', () => {
       clearTimeout(timer)
-      resolve(code === 0)
+      try {
+        const answer = JSON.parse(out) as { ok?: boolean; error?: { message?: string } }
+        resolve(answer.ok ? null : (answer.error?.message ?? 'the orca CLI failed'))
+      } catch {
+        resolve(lastLine(err) || 'the orca CLI gave no answer')
+      }
     })
   })
 }
@@ -472,10 +503,12 @@ export default function activate(orca: OrcaWorkerApi): void {
       command += ` docker exec -it ${container} sh`
       title = `${container} @ ${s.machine.name}`
     }
-    if (await openTab(title, command)) return { ok: true as const, background: false }
+    const failure = await openTab(title, command)
+    if (!failure) return { ok: true as const }
     // Without the CLI the terminal still starts, but in the background: Orca's plugin API gives it no tab.
+    orca.log(`orca terminal create: ${failure}`)
     await orca.host.call('terminal.create', { workspaceId: await pickWorkspace(), title, command })
-    return { ok: true as const, background: true }
+    return { ok: true as const, background: failure }
   })
 }
 

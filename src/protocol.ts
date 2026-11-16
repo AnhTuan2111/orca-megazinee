@@ -79,8 +79,8 @@ declare module 'orca' {
     /** Opens an Orca terminal running ssh into the machine, or docker logs, docker exec of a container. */
     'machines.terminal': {
       input: { name: string; container?: string; kind: 'shell' | 'logs' }
-      /** background is true when the orca CLI was missing and the terminal runs without a tab. */
-      output: { ok: true; background: boolean }
+      /** Set when the orca CLI failed and the terminal runs in the background without a tab: why it failed. */
+      output: { ok: true; background?: string }
     }
   }
   interface PluginPanelEvents {
