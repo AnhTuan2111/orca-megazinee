@@ -565,10 +565,22 @@ function ContainersTab(props: { m: Machine }) {
               {selected}
             </Text>
           </Box>
-          <Button size="sm" variant="ghost" icon="file-text" onPress={() => terminal(name, 'logs', selected)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="file-text"
+            tooltip="Follow this container's logs: docker logs -f --tail 200"
+            onPress={() => terminal(name, 'logs', selected)}
+          >
             Logs
           </Button>
-          <Button size="sm" variant="ghost" icon="terminal" onPress={() => terminal(name, 'shell', selected)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="terminal"
+            tooltip="Open a shell inside this container: docker exec -it ... sh. You are in the container, not on the server; exit to close."
+            onPress={() => terminal(name, 'shell', selected)}
+          >
             Shell
           </Button>
         </Box>

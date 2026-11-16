@@ -46,8 +46,6 @@ square outlines on black, and container chips sit in fixed columns so they line 
 orca plugin install AnhTuan2111/orca-machines
 ```
 
-Orca asks you to approve a Node worker, the plugin's own settings and storage, notifications, reading workspace
-names and opening terminals.
 
 ## Add machines
 
@@ -58,31 +56,17 @@ web-01=ubuntu@10.0.0.1
 db-01=deploy@db.example.com
 ```
 
-The target is what you would type after `ssh`, or a `Host` from `~/.ssh/config`. Key login only: the plugin runs
-`ssh` with `BatchMode=yes`.
+The target is what you would type after `ssh`. Key login only.
 
 ## Good to know
 
-- A short `sh` loop reads `/proc` every 2 seconds over the open connection and exits when the connection closes.
-  Docker and systemd are read every 15 seconds; `docker stats` and `du` run only when you open their tab.
-- History lives in the plugin's storage, so charts survive an Orca restart. Nothing is measured while Orca is closed.
-- Notifications run only while Orca is open. They do not replace Prometheus and Alertmanager.
-- Windows: the worker uses Git for Windows' `ssh.exe`, because the OpenSSH one that ships with Windows exits with
-  code 255 inside Orca's worker. Point the ssh path setting elsewhere if needed.
-- Shell and Logs go through the `orca` CLI (`orca terminal create --focus`), because the plugin API's
-  `terminal.create` opens no tab.
+- Nothing runs on the server after you close Orca: the `sh` loop that reads `/proc` lives on the SSH connection.
+- Windows: the worker uses Git for Windows' `ssh.exe`; the OpenSSH that ships with Windows exits with 255 in Orca.
 
 ## Develop
 
-No build step: Orca loads the `.ts` and `.tsx` files in `src/` directly.
-
 ```sh
 orca plugin dev watch .     # load and reload on save
-orca plugin test .          # tests in src/*.test.ts
-orca plugin check .         # render every scenario in src/panel.check.ts
-npx -p typescript tsc -p .  # type check
+orca plugin test .          # tests (from a copy on C: if Orca sits on another drive)
 python docs/make_svgs.py    # redraw the README images
 ```
-
-On Windows with Orca 1.4.258, `test` and `check` fail when the plugin sits on another drive than Orca
-(`cannot import "./orca-runtime.mjs"`); run them from a copy on `C:`.
