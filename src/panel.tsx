@@ -276,7 +276,8 @@ function Chart(props: {
   from: string
   to: string
 }) {
-  const HEIGHT = 44
+  // Tall enough that a few percent of difference shows as a visible step between columns.
+  const HEIGHT = 96
   const min = props.min ?? 0
   const max = props.max ?? 100
   const height = (v: number) => Math.max(3, Math.round(((Math.min(Math.max(v, min), max) - min) / (max - min || 1)) * (HEIGHT - 8)))
@@ -387,6 +388,9 @@ function OverviewTab(props: { m: Machine }) {
   }
 
   const cpu = m.cpuMinutes.filter((v): v is number => v !== null)
+  // A quiet machine sits at 20-40%; on a 0-100% scale those columns look flat, so the top follows the peak
+  // (rounded up to the next 10%, at least 20%). Colours still follow the real percent.
+  const cpuMax = cpu.length ? Math.min(100, Math.max(20, Math.ceil((Math.max(...cpu) + 5) / 10) * 10)) : 100
   const cpuSummary = cpu.length
     ? `avg ${num(cpu.reduce((a, b) => a + b, 0) / cpu.length, 0)}% · peak ${num(Math.max(...cpu), 0)}%`
     : 'not a full minute yet'
@@ -410,7 +414,14 @@ function OverviewTab(props: { m: Machine }) {
         from="24 hours ago"
         to="now"
       />
-      <Chart title="CPU in 30 minutes" summary={cpuSummary} values={m.cpuMinutes} from="30 minutes ago" to="last minute" />
+      <Chart
+        title="CPU in 30 minutes"
+        summary={cpuSummary}
+        values={m.cpuMinutes}
+        max={cpuMax}
+        from="30 minutes ago"
+        to="last minute"
+      />
       <KeyValue items={items} />
     </Stack>
   )

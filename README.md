@@ -35,8 +35,9 @@ The panel borrows the look of Orca's own status bar item, so it reads at a glanc
   in GiB, so the chips line up down the list like a table, whether the tiles stack in one column or spread into a
   grid on a wide panel.
 - **Charts.** The 24 hour disk and 30 minute CPU charts are outlined columns in the same colours. The disk chart
-  zooms into the range it actually moved in, since disk only creeps a few percent a day; a thin stub marks an hour or
-  minute without data.
+  zooms into the range it actually moved in, since disk only creeps a few percent a day, and the CPU chart's top
+  follows the peak, so a quiet machine's small swings still show; colours always follow the real percent. A thin
+  stub marks an hour or minute without data.
 - **Icons say what a container is.** Databases, queues, proxies, CI tools and monitoring each get their own icon,
   picked from the image name.
 
