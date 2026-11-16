@@ -1,53 +1,91 @@
-// `orca plugin test .` chạy tệp này trong Node, worker được thay bằng câu trả lời giả.
+// `orca plugin test .` runs this file in Node, with the worker replaced by the sample answers in src/fixtures.ts.
 import { assert, mockHost, mount, test } from 'orca/testing'
+import { containers, disk, machine, offline } from './fixtures'
 import * as panel from './panel'
+import type { Machine } from './protocol'
 
-const machine = {
-  name: 'web-01',
-  target: 'ubuntu@10.0.0.1',
-  ok: true,
-  hostname: 'app-01',
-  cpus: 15,
-  cpuPercent: 31.2,
-  memPercent: 72.4,
-  memTotalBytes: 50 * 1024 ** 3,
-  diskPercent: 80.9,
-  diskTotalBytes: 194 * 1024 ** 3,
-  load: [4.25, 4.58, 4.46] as [number, number, number],
-  uptimeSeconds: 4825440,
-  containers: { running: 76, total: 77, unhealthy: 0 },
-  failedUnits: 1,
-  at: Date.now()
-}
+/** Every machines.terminal input the panel sent, newest last. */
+const sent: unknown[] = []
 
-test('vẽ thẻ máy với số liệu worker trả về', async () => {
-  const host = mockHost({
+const hostWith = (machines: Machine[]) =>
+  mockHost({
     requests: {
-      'machines.stats': () => ({ machines: [machine, { name: 'hỏng', target: 'u@x', ok: false, error: 'Connection timed out', at: Date.now() }], intervalSeconds: 30, hosts: 'web-01=ubuntu@10.0.0.1' })
+      'machines.snapshot': () => ({ machines, hosts: 'web-01=ubuntu@10.0.0.1', sampleSeconds: 2 }),
+      'machines.containers': () => containers,
+      'machines.disk': () => disk,
+      'machines.terminal': (input: unknown) => {
+        // Orca rejects input with a field set to undefined; the panel must leave the field out.
+        assert.ok(!Object.values(input as object).includes(undefined), JSON.stringify(input))
+        sent.push(input)
+        return { ok: true }
+      }
     }
   })
-  const view = await mount(panel, { host })
+
+const NBSP = String.fromCharCode(160)
+
+test('the host list opens the offline machine first, and a row press shows its Overview', async () => {
+  const view = await mount(panel, { host: hostWith([machine, offline]) })
+  const first = JSON.stringify(view.tree())
+  assert.ok(first.includes('1/2 online'), first)
+  assert.ok(first.includes('Connection timed out'), 'the offline machine is not open first')
+  await view.press({ text: 'web-01' })
   const text = JSON.stringify(view.tree())
-  assert.ok(text.includes('1/2 online'), text)
-  assert.ok(text.includes('80,9%'), text)
-  assert.ok(text.includes('76 chạy / 77'), text)
-  assert.ok(text.includes('Connection timed out'), text)
+  assert.ok(text.includes('▰'), 'no block gauge')
+  assert.ok(text.includes('Disk / in 24 hours'))
+  assert.ok(text.includes('CPU in 30 minutes'))
+  assert.ok(text.includes('peak 93%'))
   assert.deepEqual(view.errors, [])
-  assert.deepEqual(view.refusals, [])
+  assert.deepEqual(view.warnings, [])
   await view.unmount()
 })
 
-test('chưa có máy thì hiện ô thêm máy', async () => {
-  const host = mockHost({
-    requests: { 'machines.stats': () => ({ machines: [], intervalSeconds: 30, hosts: '' }) }
-  })
-  const view = await mount(panel, { host })
-  const tree = JSON.stringify(view.tree())
-  assert.ok(tree.includes('Chưa có máy nào'))
-  // Hướng dẫn ghi máy nằm trong tooltip của icon, không hiện thành chữ trên ô nhập.
-  assert.ok(view.find({ label: 'Cách ghi danh sách máy' }), 'thiếu icon tooltip')
-  assert.ok(tree.includes('dạng tên=đích SSH'), 'tooltip mất nội dung')
+test('a new frame from the worker updates the card', async () => {
+  const view = await mount(panel, { host: hostWith([machine]) })
+  await view.post('machines.update', { machines: [{ ...machine, cpuPercent: 64.5 }] })
+  assert.ok(JSON.stringify(view.tree()).includes('64.5%'))
+  await view.unmount()
+})
+
+test('Shell sends input without undefined fields', async () => {
+  const view = await mount(panel, { host: hostWith([machine]) })
+  await view.press({ text: 'Shell' })
+  assert.deepEqual(sent.at(-1), { name: 'web-01', kind: 'shell' })
+  assert.deepEqual(view.errors, [])
+  await view.unmount()
+})
+
+test('the Containers tab shows tiles with icons, and a selected one gets Logs', async () => {
+  const view = await mount(panel, { host: hostWith([machine]) })
+  await view.select({ label: 'View web-01' }, 'containers')
+  const text = JSON.stringify(view.tree())
+  assert.ok(text.includes('"icon":"database"'), 'no database icon')
+  assert.ok(text.includes('Show 5 more'))
+  await view.press({ text: 'kafka' })
+  await view.press({ text: 'Logs' })
+  assert.deepEqual(sent.at(-1), { name: 'web-01', kind: 'logs', container: 'kafka' })
+  assert.deepEqual(view.errors, [])
+  await view.unmount()
+})
+
+test('the Disk tab has the disk map, what can be freed and the directory tree', async () => {
+  const view = await mount(panel, { host: hostWith([machine]) })
+  await view.select({ label: 'View web-01' }, 'disk')
+  const text = JSON.stringify(view.tree())
+  assert.ok(text.includes('can be freed'), text)
+  assert.ok(text.includes('/var/lib/containerd'))
+  assert.ok(text.includes(`37.0${NBSP}GiB free`), 'no free space')
+  assert.ok(text.includes('"type":"Tree"'), 'no directory tree')
+  assert.deepEqual(view.errors, [])
   assert.deepEqual(view.warnings, [])
+  await view.unmount()
+})
+
+test('with no machines the host editor shows', async () => {
+  const view = await mount(panel, { host: hostWith([]) })
+  const tree = JSON.stringify(view.tree())
+  assert.ok(tree.includes('No machines yet'))
+  assert.ok(view.find({ label: 'How to list machines' }), 'no tooltip icon')
   assert.deepEqual(view.errors, [])
   await view.unmount()
 })
