@@ -83,7 +83,7 @@ The plugin runs Node code on your computer to call `ssh`, so Orca asks you to ap
 - reading workspace names, to choose where to open terminals;
 - opening terminals, for Shell and Logs.
 
-Shell and Logs open a visible terminal tab through the `orca` CLI (`orca terminal create --focus`), because the
+Shell and Logs open a visible terminal tab in the open workspace through the `orca` CLI (`orca terminal create --focus`), because the
 plugin API's own `terminal.create` only starts a background terminal with no tab. When the CLI cannot be found, the
 terminal still starts in the background and the panel says so.
 

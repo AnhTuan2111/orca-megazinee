@@ -81,14 +81,17 @@ function orcaCli(): string | undefined {
 }
 
 /**
- * Opens a visible terminal tab in the active workspace through the orca CLI. Resolves with null on success, or the
- * reason it failed. The CLI can exit 0 and still fail, so the answer is read from its JSON `ok` field.
+ * Opens a visible terminal tab in the given workspace through the orca CLI. Resolves with null on success, or the
+ * reason it failed. The workspace is named by path, because `--worktree active` looks at the current directory and
+ * the worker runs from Orca's install folder. The CLI can exit 0 and still fail, so the answer is read from its JSON
+ * `ok` field.
  */
-function openTab(title: string, command: string): Promise<string | null> {
+function openTab(workspacePath: string, title: string, command: string): Promise<string | null> {
   const cli = orcaCli()
   if (!cli) return Promise.resolve('the orca CLI was not found')
   return new Promise((resolve) => {
-    const child = spawn(cli, ['terminal', 'create', '--worktree', 'active', '--title', title, '--command', command, '--focus', '--json'], {
+    const args = ['terminal', 'create', '--worktree', `path:${workspacePath}`, '--title', title, '--command', command, '--focus', '--json']
+    const child = spawn(cli, args, {
       windowsHide: true,
       env: cliEnv()
     })
@@ -440,7 +443,7 @@ export default function activate(orca: OrcaWorkerApi): void {
   }
 
   /** Where to open a terminal: the focused workspace if it is on this computer, else the first local one. */
-  const pickWorkspace = async (): Promise<string> => {
+  const pickWorkspace = async (): Promise<{ id: string; path: string }> => {
     const { workspaces } = await orca.host.call('workspace.list')
     const context = await orca.host.call('workspace.readContext').catch(() => null)
     const local = workspaces.filter((w) => !w.hostId)
@@ -448,7 +451,7 @@ export default function activate(orca: OrcaWorkerApi): void {
     const focused = context ? pool.find((w) => w.name === context.displayName) : undefined
     const chosen = focused ?? pool[0]
     if (!chosen) throw Object.assign(new Error('Orca has no workspace to open a terminal in.'), { code: 'action_failed' })
-    return chosen.id
+    return { id: chosen.id, path: chosen.path }
   }
 
   orca.settings.onDidChange(() => void reload())
@@ -503,11 +506,12 @@ export default function activate(orca: OrcaWorkerApi): void {
       command += ` docker exec -it ${container} sh`
       title = `${container} @ ${s.machine.name}`
     }
-    const failure = await openTab(title, command)
+    const workspace = await pickWorkspace()
+    const failure = await openTab(workspace.path, title, command)
     if (!failure) return { ok: true as const }
     // Without the CLI the terminal still starts, but in the background: Orca's plugin API gives it no tab.
     orca.log(`orca terminal create: ${failure}`)
-    await orca.host.call('terminal.create', { workspaceId: await pickWorkspace(), title, command })
+    await orca.host.call('terminal.create', { workspaceId: workspace.id, title, command })
     return { ok: true as const, background: failure }
   })
 }
