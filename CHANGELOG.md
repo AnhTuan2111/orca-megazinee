@@ -16,7 +16,7 @@
   restarting containers.
 - A host list on top with the selected machine's details below it, so many hosts stay short.
 - Shell opens an SSH terminal to the machine.
-- Everything is in English, and the README shows the panel, the status bar, the colours and the container tiles.
+- Everything is in English, and the README shows the panel, the three tabs and the colours as drawn images.
 - Needs Orca 1.4.248 or later, and adds the storage, notification, workspace read and terminal permissions.
 
 ## 0.1.0
