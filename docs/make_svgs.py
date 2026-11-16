@@ -101,8 +101,8 @@ CPU_MINUTES = [18, 21, 19, 24, 22, 20, 26, 31, 28, 25, 22, 54, 72, 86, 81, 64, 3
 
 
 def panel(W=440):
-    """The Machines panel as it looks in Orca's sidebar, at width W. Returns the body and its height."""
-    b = [text(20, 34, 'Machines', 16, TEXT, 700), chip(108, 20, '2/3 online', C['red'])]
+    """The Megazinee panel as it looks in Orca's sidebar, at width W. Returns the body and its height."""
+    b = [text(20, 34, 'Megazinee', 16, TEXT, 700), chip(116, 20, '2/3 online', C['red'])]
     y = 54
     for name, cpu, ram, disk, sel in [('web-01', 27, 71, 82, True), ('db-01', 12, 44, 38, False)]:
         b.append(rect(20, y, W - 40, 30, stroke=C['blue'] if sel else LINE))
@@ -155,7 +155,7 @@ body, ph = panel()
 HW, HH = 920, 520
 scale = (HH - 40) / ph
 h = [f'<g transform="translate({HW - 440 * scale - 30:.1f},20) scale({scale:.4f})">{body}</g>']
-h.append(text(48, 150, 'Machines', 56, TEXT, 800))
+h.append(text(48, 150, 'Megazinee', 56, TEXT, 800))
 h.append(text(50, 200, 'Your servers, live in Orca.', 24, TEXT, 500))
 h.append(text(50, 236, 'One SSH connection per server. Nothing installed on it.', 15, MUTED))
 h.append(cells(50, 272, [(C['green'], 3), (C['blue'], 2), (C['yellow'], 2), (C['red'], 2)], 10, cw=16, ch=18, gap=4, slant=4))

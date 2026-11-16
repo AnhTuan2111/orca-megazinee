@@ -1,7 +1,7 @@
-<img src="docs/hero.svg" width="100%" alt="Machines: your servers, live in Orca. A host list with CPU, RAM and disk per machine, block gauges, a 24 hour disk chart, and a red status bar item for the machine at 82% disk">
+<img src="docs/hero.svg" width="100%" alt="Megazinee: your servers, live in Orca. A host list with CPU, RAM and disk per machine, block gauges, a 24 hour disk chart, and a red status bar item for the machine at 82% disk">
 
 ```sh
-orca plugin install AnhTuan2111/orca-machines
+orca plugin install AnhTuan2111/orca-megazinee
 ```
 
 ## Three tabs per machine

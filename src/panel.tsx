@@ -1,4 +1,4 @@
-// The Machines panel. The worker pushes numbers through machines.update on every new frame; the panel never
+// The Megazinee panel. The worker pushes numbers through machines.update on every new frame; the panel never
 // polls. On top is a compact host list, one row per machine; the selected machine's details sit below it in three
 // tabs: Overview, Containers, Disk. So many hosts add rows, not whole cards. Containers and Disk ask the worker only
 // when opened, because docker stats and du are slow.
@@ -863,7 +863,7 @@ export default function Panel() {
     <Stack gap="md">
       <Row justify="between" align="center">
         <Row gap="sm" align="center">
-          <Heading level={2}>Machines</Heading>
+          <Heading level={2}>Megazinee</Heading>
           {list.length ? (
             <Chip tone={online === list.length ? 'success' : list.some((m) => m.state === 'offline') ? 'danger' : 'neutral'}>
               {`${online}/${list.length} online`}

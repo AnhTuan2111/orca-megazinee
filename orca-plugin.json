@@ -1,7 +1,7 @@
 {
   "manifestVersion": 2,
-  "id": "machines",
-  "name": "Machines",
+  "id": "megazinee",
+  "name": "Megazinee",
   "version": "0.2.0",
   "description": "Live CPU, RAM, disk and containers of your SSH servers, with 24 hour disk trends, in a sidebar panel and the status bar.",
   "engines": {
@@ -13,8 +13,8 @@
   "contributes": {
     "panels": [
       {
-        "id": "machines",
-        "title": "Machines",
+        "id": "megazinee",
+        "title": "Megazinee",
         "icon": "gauge",
         "entry": "src/panel.tsx",
         "ui": "components"
@@ -57,18 +57,18 @@
     ],
     "commands": [
       {
-        "id": "machines.toggleSidebar",
-        "title": "Machines: toggle the right sidebar",
+        "id": "megazinee.toggleSidebar",
+        "title": "Megazinee: toggle the right sidebar",
         "action": "sidebar.right.toggle"
       }
     ],
     "statusBarItems": [
       {
-        "id": "machines",
-        "text": "Machines",
+        "id": "megazinee",
+        "text": "Megazinee",
         "icon": "gauge",
         "tooltip": "No machines yet.",
-        "command": "machines.toggleSidebar"
+        "command": "megazinee.toggleSidebar"
       }
     ]
   },

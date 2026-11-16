@@ -21,7 +21,7 @@ import {
 } from './parse'
 import type { Machine } from './protocol'
 
-const STATUS_ITEM = 'machines'
+const STATUS_ITEM = 'megazinee'
 /** How long a machine must stay unreachable before we notify, so a short network blip stays quiet. */
 const OFFLINE_ALERT_MS = 30_000
 /** How long CPU must stay high before we notify. */
@@ -298,7 +298,7 @@ const levelPaint: Record<Level, Paint> = { ok: 'success', warning: 'warning', da
 
 /** The status bar item shows the worst machine: offline first, then over a threshold, then the first one. */
 export function statusFor(machines: Machine[]): { text: string; tone: Paint | 'neutral'; tooltip: string; visible: boolean } {
-  if (!machines.length) return { text: 'Machines', tone: 'neutral', tooltip: 'No machines yet.', visible: false }
+  if (!machines.length) return { text: 'Megazinee', tone: 'neutral', tooltip: 'No machines yet.', visible: false }
   const rank = (m: Machine) => (m.state === 'offline' ? 3 : { ok: 0, warning: 1, danger: 2 }[levelOf(m)])
   const worst = machines.reduce((a, b) => (rank(b) > rank(a) ? b : a))
   let text: string
@@ -341,7 +341,7 @@ export class AlertTracker {
       done.add(p.key)
       out.push({
         title: `${m.name}: ${p.key === 'offline' ? 'offline' : p.text}`,
-        body: p.key === 'offline' ? p.text : 'Open the Machines panel for details.'
+        body: p.key === 'offline' ? p.text : 'Open the Megazinee panel for details.'
       })
     }
     for (const key of [...done]) {

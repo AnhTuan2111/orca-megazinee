@@ -2,6 +2,8 @@
 
 ## 0.2.0
 
+- The plugin is now called Megazinee (id `megazinee`, repository `orca-megazinee`), after its gauges that fill
+  like a magazine being loaded. Orca sees it as a new plugin: add your machines again.
 - Each machine keeps one SSH connection and is sampled every 2 seconds instead of every 30. The `intervalSeconds`
   setting is replaced by `sampleSeconds`.
 - Machine cards have three tabs: Overview, Containers and Disk.
