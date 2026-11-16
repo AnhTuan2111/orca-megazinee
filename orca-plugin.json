@@ -1,0 +1,56 @@
+{
+  "manifestVersion": 2,
+  "id": "machines",
+  "name": "Machines",
+  "version": "0.1.0",
+  "description": "CPU, RAM, disk, load and containers of your SSH servers in a sidebar panel.",
+  "engines": {
+    "orca": ">=1.4.246"
+  },
+  "execution": "trusted-worker",
+  "pluginApi": 1,
+  "main": "src/worker.ts",
+  "contributes": {
+    "panels": [
+      {
+        "id": "machines",
+        "title": "Machines",
+        "icon": "gauge",
+        "entry": "src/panel.tsx",
+        "ui": "components"
+      }
+    ],
+    "settings": [
+      {
+        "key": "hosts",
+        "title": "Máy cần theo dõi",
+        "description": "Mỗi dòng một máy, dạng tên=đích SSH, ví dụ: web-01=ubuntu@10.0.0.1. Máy phải SSH được bằng khoá, không hỏi mật khẩu.",
+        "type": "string",
+        "multiline": true,
+        "default": "",
+        "placeholder": "web-01=ubuntu@10.0.0.1"
+      },
+      {
+        "key": "intervalSeconds",
+        "title": "Số giây giữa hai lần lấy số liệu",
+        "type": "integer",
+        "default": 30,
+        "minimum": 10,
+        "maximum": 600
+      },
+      {
+        "key": "sshCommand",
+        "title": "Đường dẫn chương trình ssh",
+        "description": "Để trống thì dùng ssh của Git for Windows nếu có, không thì dùng ssh trên PATH.",
+        "type": "string",
+        "default": "",
+        "placeholder": "C:/Program Files/Git/usr/bin/ssh.exe"
+      }
+    ]
+  },
+  "capabilities": [
+    {
+      "kind": "settings:own"
+    }
+  ]
+}
