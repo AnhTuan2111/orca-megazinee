@@ -42,7 +42,7 @@
       {
         "key": "alerts",
         "title": "Desktop notifications",
-        "description": "Notify when a machine is offline for 30 seconds, disk or RAM reaches 90%, CPU stays at 90% for a minute, or a container is unhealthy or restarting.",
+        "description": "Notify when a machine is offline for 30 seconds, disk or RAM reaches 80%, CPU stays at 80% for a minute, or a container is unhealthy or restarting.",
         "type": "boolean",
         "default": true
       },

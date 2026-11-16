@@ -35,7 +35,7 @@ import {
   type Tone,
   type TreeItem
 } from 'orca'
-import { levelOf, percentLevel, type Level } from './health'
+import { percentLevel, percentPaint } from './health'
 import type { Container, DiskReport, Machine } from './protocol'
 
 type TabId = 'overview' | 'containers' | 'disk'
@@ -181,12 +181,8 @@ function uptimeText(seconds: number): string {
   return `${hours}h ${Math.floor((seconds % 3_600) / 60)}m`
 }
 
-const toneOf = (level: Level): Tone => (level === 'ok' ? 'success' : level)
-/** Colour of bars, columns and numbers: blue when fine, yellow and red past the thresholds. */
-function barTone(percent: number): Tone {
-  const level = percentLevel(percent)
-  return level === 'ok' ? 'accent' : level
-}
+/** Colour of bars, columns and numbers: green, blue, yellow, red as the percent climbs (see health.ts). */
+const barTone = (percent: number): Tone => percentPaint(percent)
 const share = (part: number, whole: number) => (whole > 0 ? Math.max(0, Math.min(1, part / whole)) : 0)
 
 /** A chip: square-cornered coloured outline and text on a black background. */
@@ -647,8 +643,8 @@ export function dirTree(dirs: { path: string; bytes: number }[], diskBytes: numb
   return strip(roots)
 }
 
-// Red is kept for alerts, so the disk map uses blue for Docker and green and yellow for the two largest directories.
-const MAP_TONES: Tone[] = ['success', 'warning']
+// Yellow and red mean trouble, so the disk map only uses blue for Docker, green for the largest directory, grey for the rest.
+const MAP_TONES: Tone[] = ['success']
 
 function DiskTab(props: { m: Machine }) {
   const { name } = props.m
@@ -672,8 +668,8 @@ function DiskTab(props: { m: Machine }) {
   const size = root?.sizeBytes ?? 0
   const used = root?.usedBytes ?? 0
 
-  // The disk map: Docker (du skips /var/lib/docker), the two largest top-level directories, the rest, free space.
-  const tops = report.dirs.filter((d) => d.path.split('/').length === 2).slice(0, 2)
+  // The disk map: Docker (du skips /var/lib/docker), the largest top-level directory, the rest, free space.
+  const tops = report.dirs.filter((d) => d.path.split('/').length === 2).slice(0, MAP_TONES.length)
   const topBytes = tops.reduce((a, d) => a + d.bytes, 0)
   const dockerBytes = Math.min(docker.reduce((a, d) => a + d.sizeBytes, 0), Math.max(0, used - topBytes))
   const other = Math.max(0, used - dockerBytes - topBytes)

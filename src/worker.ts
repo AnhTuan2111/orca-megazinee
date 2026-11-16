@@ -6,7 +6,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import type { OrcaWorkerApi } from 'orca/worker'
-import { problemsOf, levelOf, type Level } from './health'
+import { problemsOf, levelOf, percentPaint, worsePaint, type Level, type Paint } from './health'
 import { asHistory, cpuMinutes, diskHours, diskTrend, emptyHistory, Recorder, type History } from './history'
 import {
   applyFrame,
@@ -294,11 +294,10 @@ export function gauge(percent: number): string {
   return '▰'.repeat(filled) + '▱'.repeat(8 - filled)
 }
 
-// The status bar is where a glance should catch trouble, so anything past the first threshold shows red there.
-const toneOf: Record<Level, 'neutral' | 'warning' | 'danger'> = { ok: 'neutral', warning: 'danger', danger: 'danger' }
+const levelPaint: Record<Level, Paint> = { ok: 'success', warning: 'warning', danger: 'danger' }
 
 /** The status bar item shows the worst machine: offline first, then over a threshold, then the first one. */
-export function statusFor(machines: Machine[]): { text: string; tone: 'neutral' | 'warning' | 'danger'; tooltip: string; visible: boolean } {
+export function statusFor(machines: Machine[]): { text: string; tone: Paint | 'neutral'; tooltip: string; visible: boolean } {
   if (!machines.length) return { text: 'Machines', tone: 'neutral', tooltip: 'No machines yet.', visible: false }
   const rank = (m: Machine) => (m.state === 'offline' ? 3 : { ok: 0, warning: 1, danger: 2 }[levelOf(m)])
   const worst = machines.reduce((a, b) => (rank(b) > rank(a) ? b : a))
@@ -309,8 +308,15 @@ export function statusFor(machines: Machine[]): { text: string; tone: 'neutral' 
   const online = machines.filter((m) => m.state === 'online').length
   if (machines.length > 1) text = `${online}/${machines.length} · ${text}`
   const tooltip = machines.map(summary).join('\n')
-  const level: Level = worst.state === 'offline' ? 'danger' : levelOf(worst)
-  return { text, tone: toneOf[level], tooltip, visible: true }
+  // The item takes the colour of the worst of its numbers, or of a problem such as an unhealthy container.
+  const numbers = [worst.cpuPercent, worst.memPercent, worst.diskPercent].filter((v): v is number => v !== undefined)
+  const tone: Paint | 'neutral' =
+    worst.state === 'offline'
+      ? 'danger'
+      : !worst.at
+        ? 'neutral'
+        : worsePaint(levelPaint[levelOf(worst)], percentPaint(numbers.length ? Math.max(...numbers) : 0))
+  return { text, tone, tooltip, visible: true }
 }
 
 /** Remembers which alerts went out, so each crossing notifies once and only notifies again after it clears. */

@@ -10,12 +10,13 @@
 - Containers: every container with an icon, state, CPU and RAM in aligned columns, a grid when the panel is wide, and
   Logs and Shell buttons that open Orca terminals.
 - Disk: a disk map, reclaimable Docker space, Docker types, a directory tree and the largest container logs.
-- A status bar item with a block gauge for the machine in the worst shape, red once a threshold is crossed.
-- Desktop notifications for offline machines, full disk or RAM, sustained high CPU, and unhealthy or restarting
-  containers.
+- A status bar item with a block gauge for the machine in the worst shape.
+- Four colours from calm to urgent: green below 50%, blue from 50%, yellow from 70%, red from 80%.
+- Desktop notifications for offline machines, disk or RAM from 80%, CPU at 80% for a minute, and unhealthy or
+  restarting containers.
 - A host list on top with the selected machine's details below it, so many hosts stay short.
 - Shell opens an SSH terminal to the machine.
-- Everything is in English.
+- Everything is in English, and the README shows the panel, the status bar, the colours and the container tiles.
 - Needs Orca 1.4.248 or later, and adds the storage, notification, workspace read and terminal permissions.
 
 ## 0.1.0

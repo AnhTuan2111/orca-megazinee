@@ -3,8 +3,26 @@ import type { Machine } from './protocol'
 
 export type Level = 'ok' | 'warning' | 'danger'
 
+/**
+ * Four colours, least to most severe: green, blue, yellow, red. Green below 50%, blue from 50%, yellow from 70%,
+ * red from 80%. Yellow and red are also the warning and danger levels that alerts and the status bar use.
+ */
+export type Paint = 'success' | 'accent' | 'warning' | 'danger'
+
+export const BUSY_PERCENT = 50
 export const WARN_PERCENT = 70
-export const DANGER_PERCENT = 90
+export const DANGER_PERCENT = 80
+
+const paintRank: Record<Paint, number> = { success: 0, accent: 1, warning: 2, danger: 3 }
+
+export function percentPaint(percent: number): Paint {
+  if (percent >= DANGER_PERCENT) return 'danger'
+  if (percent >= WARN_PERCENT) return 'warning'
+  if (percent >= BUSY_PERCENT) return 'accent'
+  return 'success'
+}
+
+export const worsePaint = (a: Paint, b: Paint): Paint => (paintRank[a] >= paintRank[b] ? a : b)
 
 export function percentLevel(percent: number | undefined): Level {
   if (percent === undefined) return 'ok'
