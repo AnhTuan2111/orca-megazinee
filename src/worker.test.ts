@@ -33,6 +33,13 @@ test('the status bar shows the worst machine with its level colour', () => {
   assert.equal(statusFor([]).visible, false)
 })
 
+test('the tooltip stays under Orca\'s 256 character limit with many machines', () => {
+  const many = Array.from({ length: 12 }, (_, i) => ({ ...base, name: `machine-${i + 1}` }))
+  const tooltip = statusFor(many).tooltip
+  assert.ok(tooltip.length <= 256, `${tooltip.length}`)
+  assert.ok(/\+\d+ more$/.test(tooltip), tooltip)
+})
+
 test('each crossing notifies once, and again only after it clears', () => {
   const t = new AlertTracker()
   assert.deepEqual(t.check(base, 0), [])

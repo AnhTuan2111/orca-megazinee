@@ -297,6 +297,25 @@ export function gauge(percent: number): string {
 
 const levelPaint: Record<Level, Paint> = { ok: 'success', warning: 'warning', danger: 'danger' }
 
+/** Orca refuses a status bar tooltip over this many characters, and then keeps the item's old text. */
+const TOOLTIP_MAX = 256
+
+/** Joins summary lines, worst first, as far as they fit, and counts the rest as "+N more". */
+export function fitTooltip(lines: string[]): string {
+  const out: string[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const rest = lines.length - i - 1
+    const tail = rest ? `\n+${rest} more` : ''
+    const line = lines[i].length > TOOLTIP_MAX ? `${lines[i].slice(0, TOOLTIP_MAX - 20)}...` : lines[i]
+    if ([...out, line].join('\n').length + tail.length > TOOLTIP_MAX) {
+      out.push(`+${lines.length - i} more`)
+      break
+    }
+    out.push(line)
+  }
+  return out.join('\n')
+}
+
 /** The status bar item shows the worst machine: offline first, then over a threshold, then the first one. */
 export function statusFor(machines: Machine[]): { text: string; tone: Paint | 'neutral'; tooltip: string; visible: boolean } {
   if (!machines.length) return { text: 'Megazinee', tone: 'neutral', tooltip: 'No machines yet.', visible: false }
@@ -308,7 +327,7 @@ export function statusFor(machines: Machine[]): { text: string; tone: Paint | 'n
   else text = `${worst.name} disk ${gauge(worst.diskPercent ?? 0)} ${round(worst.diskPercent)} · CPU ${round(worst.cpuPercent)}`
   const online = machines.filter((m) => m.state === 'online').length
   if (machines.length > 1) text = `${online}/${machines.length} · ${text}`
-  const tooltip = machines.map(summary).join('\n')
+  const tooltip = fitTooltip([...machines].sort((a, b) => rank(b) - rank(a)).map(summary))
   // The item takes the colour of the worst of its numbers, or of a problem such as an unhealthy container.
   const numbers = [worst.cpuPercent, worst.memPercent, worst.diskPercent].filter((v): v is number => v !== undefined)
   const tone: Paint | 'neutral' =
