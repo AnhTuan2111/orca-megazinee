@@ -506,6 +506,8 @@ export default function activate(orca: OrcaWorkerApi): void {
     }
     const cached = (await orca.storage.get('cache').catch(() => null)) as Partial<Cache> | null
     if (cached && typeof cached === 'object') cache = { containers: cached.containers ?? {}, disk: cached.disk ?? {} }
+    // Reports from before 0.3.0 trusted Docker's reclaimable images, which is wrong with containerd; drop them.
+    for (const [name, r] of Object.entries(cache.disk)) if (r.unusedImageBytes === undefined) delete cache.disk[name]
     await reload()
   })()
 

@@ -92,16 +92,21 @@ test('reads the disk report', () => {
     'D\t150000000\t/var',
     'D\t140000000\t/var/lib',
     'DRC\t0\t/var',
-    'L\t3000000\t/var/lib/docker/containers/' + id + '/' + id + '-json.log'
+    'L\t3000000\t/var/lib/docker/containers/' + id + '/' + id + '-json.log',
+    'I\tsha256:aaa\t1.2GB',
+    'I\tsha256:bbb\t300MB',
+    'U\tsha256:aaa'
   ].join('\n')
   const r = parseDisk(out, 5)
   assert.equal(r.sudo, true)
   assert.equal(r.filesystems[0].mount, '/')
   assert.equal(r.filesystems[0].percent, 80.9)
-  assert.equal(r.docker?.[0].reclaimableBytes, 40.1e9)
   assert.deepEqual(r.dirs.map((d) => d.path), ['/var', '/var/lib', '/home'])
   assert.equal(r.dirsPartial, false)
   assert.deepEqual(r.logs, [{ container: 'kafka', bytes: 3000000 * 1024 }])
+  // Only bbb has no container; Docker's own 40.1GB reclaimable for Images is replaced by that.
+  assert.equal(r.unusedImageBytes, 300e6)
+  assert.equal(r.docker?.[0].reclaimableBytes, 300e6)
 })
 
 test('a docker system df timeout is an error, a du timeout marks the dirs incomplete', () => {

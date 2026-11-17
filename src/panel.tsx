@@ -701,7 +701,10 @@ function DiskTab(props: { m: Machine }) {
 
   const root = report.filesystems.find((f) => f.mount === '/') ?? report.filesystems[0]
   const docker = report.docker ?? []
-  const reclaimable = docker.reduce((a, d) => a + d.reclaimableBytes, 0)
+  // Only what is safe to free: images no container uses and build cache. Volumes no container uses can still hold
+  // a database or uploads, so they are shown apart and never counted here.
+  const reclaimable = docker.filter((d) => d.type !== 'Local Volumes').reduce((a, d) => a + d.reclaimableBytes, 0)
+  const looseVolumes = docker.find((d) => d.type === 'Local Volumes')?.reclaimableBytes ?? 0
   const dockerMax = Math.max(1, ...docker.map((d) => d.sizeBytes))
   const size = root?.sizeBytes ?? 0
   const used = root?.usedBytes ?? 0
@@ -733,8 +736,11 @@ function DiskTab(props: { m: Machine }) {
 
       {reclaimable > 0 ? (
         <Callout tone="success" title={`About ${bytes(reclaimable)} can be freed`} icon="check">
-          <Text size="sm">Old images, build cache and volumes no container uses.</Text>
+          <Text size="sm">Images no container uses and build cache.</Text>
         </Callout>
+      ) : null}
+      {looseVolumes > 0 ? (
+        <Text muted size="xs">{`${bytes(looseVolumes)} sit in volumes no container uses. They can hold data, so check each one before deleting.`}</Text>
       ) : null}
 
       <Stack gap="xs">
@@ -758,7 +764,7 @@ function DiskTab(props: { m: Machine }) {
                     { tone: 'success', share: share(d.reclaimableBytes, dockerMax) }
                   ]}
                 />
-                <Text muted size="xs">{`${bytes(d.sizeBytes - d.reclaimableBytes)} in use, ${bytes(d.reclaimableBytes)} reclaimable`}</Text>
+                <Text muted size="xs">{`${bytes(d.sizeBytes - d.reclaimableBytes)} in use, ${bytes(d.reclaimableBytes)} ${d.type === 'Local Volumes' ? 'not attached' : 'reclaimable'}`}</Text>
               </Frame>
             ))}
           </Grid>

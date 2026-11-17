@@ -62,6 +62,8 @@ export type DiskReport = {
   logs: { container: string; bytes: number }[]
   /** Whether du ran with sudo; without it, directories the SSH user cannot read are undercounted. */
   sudo: boolean
+  /** Bytes of images no container uses, counted from docker images and the containers' image ids. */
+  unusedImageBytes?: number
 }
 
 declare module 'orca' {
