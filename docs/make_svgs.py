@@ -36,8 +36,12 @@ def spans(x, y, parts, size=13, anchor='start'):
     return f'<text x="{x}" y="{y}" font-family="{FONT}" font-size="{size}" text-anchor="{anchor}" xml:space="preserve">{inner}</text>'
 
 
-def rect(x, y, w, h, stroke=LINE, fill='none'):
-    return f'<rect x="{x + 0.5}" y="{y + 0.5}" width="{w}" height="{h}" fill="{fill}" stroke="{stroke}" stroke-width="1"/>'
+def rect(x, y, w, h, stroke=LINE, fill='none', cut=None):
+    """A frame with the top left and bottom right corners cut, like augmented-ui draws them in the panel."""
+    c = min(7, h * 0.3) if cut is None else cut
+    x, y = x + 0.5, y + 0.5
+    pts = f'{x + c},{y} {x + w},{y} {x + w},{y + h - c} {x + w - c},{y + h} {x},{y + h} {x},{y + c}'
+    return f'<polygon points="{pts}" fill="{fill}" stroke="{stroke}" stroke-width="1"/>'
 
 
 def cells(x, y, parts, total, cw=11, ch=12, gap=2.5, slant=3):
@@ -74,7 +78,10 @@ def chart(x, y, w, h, values, lo, hi):
             continue
         bh = max(3, (min(max(v, lo), hi) - lo) / (hi - lo) * (h - 10))
         col = paint(v)
-        out.append(f'<rect x="{bx:.1f}" y="{y + h - 4 - bh:.1f}" width="{bw:.1f}" height="{bh:.1f}" fill="{col}" fill-opacity="0.18" stroke="{col}" stroke-width="1"/>')
+        top = y + h - 4 - bh
+        c = min(4, bw * 0.5, bh * 0.5)
+        pts = f'{bx + c:.1f},{top:.1f} {bx + bw:.1f},{top:.1f} {bx + bw:.1f},{top + bh:.1f} {bx:.1f},{top + bh:.1f} {bx:.1f},{top + c:.1f}'
+        out.append(f'<polygon points="{pts}" fill="{col}" fill-opacity="0.18" stroke="{col}" stroke-width="1"/>')
     return ''.join(out)
 
 
@@ -156,10 +163,10 @@ HW, HH = 920, 520
 scale = (HH - 40) / ph
 h = [f'<g transform="translate({HW - 440 * scale - 30:.1f},20) scale({scale:.4f})">{body}</g>']
 h.append(text(48, 150, 'Megazinee', 56, TEXT, 800))
-h.append(text(50, 200, 'Your servers, live in Orca.', 24, TEXT, 500))
-h.append(text(50, 236, 'One SSH connection per server. Nothing installed on it.', 15, MUTED))
+h.append(text(50, 200, 'Server health in the Orca sidebar.', 24, TEXT, 500))
+h.append(text(50, 236, 'CPU, RAM, disk and containers over one SSH connection.', 15, MUTED))
 h.append(cells(50, 272, [(C['green'], 3), (C['blue'], 2), (C['yellow'], 2), (C['red'], 2)], 10, cw=16, ch=18, gap=4, slant=4))
-h.append(text(50, 340, 'In the status bar, the machine that needs you:', 13, MUTED))
+h.append(text(50, 340, 'Status bar:', 13, MUTED))
 h.append(status_item(50, 354))
 open(f'{OUT}/hero.svg', 'w', encoding='utf-8', newline='\n').write(svg(HW, HH, ''.join(h)))
 
@@ -167,8 +174,8 @@ open(f'{OUT}/hero.svg', 'w', encoding='utf-8', newline='\n').write(svg(HW, HH, '
 TW, TH = 920, 330
 t = []
 cols = [30, 330, 630]
-titles = [('Overview', 'Gauges, 24 hour disk, 30 minute CPU.'), ('Containers', 'State, CPU, RAM. Logs and Shell.'),
-          ('Disk', 'Where the space went, what to free.')]
+titles = [('Overview', 'Gauges, 24 hour disk, 30 minute CPU.'), ('Containers', 'State, CPU, RAM, logs.'),
+          ('Disk', 'What fills the disk.')]
 for x, (title, line) in zip(cols, titles):
     t.append(text(x, 36, title, 18, TEXT, 700))
     t.append(text(x, 58, line, 12, MUTED))

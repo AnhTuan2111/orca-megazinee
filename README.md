@@ -1,44 +1,53 @@
-<img src="docs/hero.svg" width="100%" alt="Megazinee: your servers, live in Orca. A host list with CPU, RAM and disk per machine, block gauges, a 24 hour disk chart, and a red status bar item for the machine at 82% disk">
+<img src="docs/hero.svg" width="100%" alt="Megazinee in the Orca sidebar: a list of servers with CPU, RAM and disk, gauges, a 24 hour disk chart, and a red status bar item for a server at 82% disk">
+
+Megazinee is an [Orca](https://github.com/stablyai/orca) plugin that shows CPU, RAM, disk and Docker containers for
+Linux servers you can reach over SSH. It keeps one SSH connection open per server and reads `/proc` every two
+seconds. Nothing is installed on the servers.
 
 ```sh
 orca plugin install AnhTuan2111/orca-megazinee
 ```
 
-## Three tabs per machine
+## In the panel
 
-<img src="docs/tabs.svg" width="100%" alt="Overview with gauges and a disk chart, Containers with state, CPU and RAM chips in aligned columns, Disk with a disk map, space to free and a directory tree">
+Each server gets a row with its CPU, RAM and disk. Click a row to open that server below the list.
 
-Notifications when a machine goes offline, disk or RAM passes 80%, CPU stays above 80%, or a container fails.
+<img src="docs/tabs.svg" width="100%" alt="The Overview tab with gauges and a disk chart, the Containers tab with state, CPU and RAM per container, the Disk tab with a disk map and the largest directories">
 
-## Two panels
+- **Overview**: CPU, RAM and disk now, disk over the last 24 hours, CPU over the last 30 minutes, load and network.
+- **Containers**: state, CPU and RAM of every container. Select one to read its logs in the panel (search, filter by
+  level, follow) or to open a shell in it.
+- **Disk**: what takes up the disk, how much Docker could give back, and the largest directories.
 
-**Megazinee** uses Orca's own controls. **Megazinee FUI** draws the same features as a sci-fi HUD with cut-corner
-frames and glowing gauges, and reads container logs in place: follow, search with highlights, level filters, pause,
-copy, download.
+The status bar shows whichever server is in the worst state. Orca also sends a desktop notification when a server
+stops answering, when disk or RAM goes past 80%, when CPU stays above 80% for a minute, or when a container turns
+unhealthy.
 
-## Four colours
+## Colours
 
-<img src="docs/colors.svg" width="100%" alt="Green below 50%, blue from 50 to 69%, yellow from 70 to 79%, red from 80%">
+Green under 50%, blue from 50%, yellow from 70%, red from 80%.
 
-## Add a machine
+<img src="docs/colors.svg" width="100%" alt="Green under 50%, blue from 50 to 69%, yellow from 70 to 79%, red from 80%">
 
-Press the gear on the panel, add a line, press Save. Key login only.
+## Adding servers
+
+Click the gear at the top of the panel, write one server per line, then Save. Add `:port` if SSH is not on port 22.
 
 ```text
 web-01=ubuntu@10.0.0.1
 monitor=admin@10.0.0.2:2222
 ```
 
-On Windows the plugin uses Git for Windows' `ssh.exe`.
+The servers have to accept your SSH key; the plugin never asks for a password. On Windows it runs the `ssh.exe` that
+comes with Git for Windows, because the OpenSSH bundled with Windows exits with code 255 inside Orca's worker.
 
-## Credits
-
-Cut-corner frames by [augmented-ui](https://github.com/propjockey/augmented-ui) (BSD-2-Clause, `vendor/augmented-ui`).
-
-## Develop
+## Working on it
 
 ```sh
-orca plugin dev watch .     # load, reload on save
-orca plugin test .          # tests
-python docs/make_svgs.py    # redraw these images
+orca plugin dev watch .     # load the folder into Orca, reload on save
+orca plugin test .          # run the tests
+python docs/make_svgs.py    # redraw the images in this README
 ```
+
+The cut corners come from [augmented-ui](https://github.com/propjockey/augmented-ui) (BSD-2-Clause), kept in
+`vendor/augmented-ui`.

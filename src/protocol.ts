@@ -1,4 +1,4 @@
-// The contract between the panel and the worker: src/panel.tsx and src/worker.ts both read this file.
+// The contract between the panel (src/fui/fui.js) and the worker (src/worker.ts): requests, outputs and pushed events.
 export {}
 
 export type MachineState = 'connecting' | 'online' | 'offline'

@@ -1,5 +1,4 @@
-// Megazinee FUI panel: the same features as the components panel (src/panel.tsx), drawn as an HTML page so it can
-// use augmented-ui cut frames and CSS charge gauges. It talks to the same worker through orca.plugin.request and
+// The Megazinee panel, an HTML page so it can use augmented-ui cut frames and CSS charge gauges. It talks to the same worker through orca.plugin.request and
 // hears its pushes through orca.plugin.on. Each part of the page has its own render function, so the 2 second
 // updates redraw the host list and the Overview only, never an input you are typing in.
 
