@@ -89,11 +89,21 @@ declare module 'orca' {
       /** Set when the orca CLI failed and the terminal runs in the background without a tab: why it failed. */
       output: { ok: true; background?: string }
     }
+    /** Starts following a container's logs; lines arrive as machines.logLines posts to the asking panel. */
+    'machines.logs.start': {
+      input: { name: string; container: string; tail: number; timestamps: boolean }
+      output: { streamId: string }
+    }
+    /** Keeps a log stream alive; one the panel stops pinging for 45 seconds is closed. */
+    'machines.logs.ping': { input: { streamId: string }; output: { alive: boolean } }
+    'machines.logs.stop': { input: { streamId: string }; output: { ok: true } }
   }
   interface PluginPanelEvents {
     /** Sent by the worker on every new frame or connection state change. */
     'machines.update': { machines: Machine[] }
     /** A disk report the worker measured in the background. */
     'machines.diskReport': { name: string; report: DiskReport }
+    /** New log lines of a stream; ended is set once the stream stops, with error when ssh or docker failed. */
+    'machines.logLines': { streamId: string; lines: string[]; ended?: boolean; error?: string }
   }
 }

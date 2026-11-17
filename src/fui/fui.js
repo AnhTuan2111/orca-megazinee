@@ -15,6 +15,8 @@ const app = {
   picked: {},
   showAll: {},
   editing: false,
+  /** The open log view, or null. */
+  log: null,
   draft: null,
   notice: null,
   /** Gauges charge cell by cell until this time, so they animate when a view opens, not on every update. */
@@ -272,8 +274,9 @@ function renderDetail() {
           .map((t) => `<button class="tab" role="tab" aria-selected="${t === tab}" data-act="tab" data-tab="${t}">${t[0].toUpperCase() + t.slice(1)}</button>`)
           .join('')}
       </div>
-      <div id="tab-body">${tab === 'overview' ? overview(m) : tab === 'containers' ? containersTab(m) : diskTab(m)}</div>`
+      <div id="tab-body">${app.log && app.log.name === m.name ? logView() : tab === 'overview' ? overview(m) : tab === 'containers' ? containersTab(m) : diskTab(m)}</div>`
   const keepFilter = tab === 'containers' && document.activeElement?.id === 'filter'
+  const keepLogQuery = document.activeElement?.id === 'log-q'
   $('detail').innerHTML = `<div class="frame" data-augmented-ui="tl-clip br-clip border">
     <div class="detail-head">
       <div><h2>${esc(m.name)}</h2><p class="muted">${esc(sub)}</p></div>
@@ -283,6 +286,10 @@ function renderDetail() {
     const f = $('filter')
     f.focus()
     f.setSelectionRange(f.value.length, f.value.length)
+  }
+  if (app.log) {
+    renderLogLines()
+    if (keepLogQuery) $('log-q')?.focus()
   }
 }
 
@@ -482,6 +489,254 @@ function diskTab(m) {
   </div>`
 }
 
+
+// ----- log viewer -----
+// A container's logs inside the panel, in the spirit of Portainer's log view: follow, search with highlight, level
+// filters, wrap, timestamps, how many lines to fetch, pause, copy and download. The worker streams `docker logs -f`.
+
+const LEVELS = [
+  ['error', 'Error', 'red'],
+  ['warn', 'Warn', 'yellow'],
+  ['info', 'Info', 'blue'],
+  ['other', 'Other', 'gray']
+]
+const ANSI = /\x1b\[[0-9;]*[A-Za-z]/g
+
+/**
+ * The level is the first level word in the line (ERROR, WARN, INFO, DEBUG...), so "WARN ... got error" stays a
+ * warning. Lines without one count as errors only when they carry an exception or a panic.
+ */
+const LEVEL_WORD = /\b(fatal|panic|crit(?:ical)?|severe|err(?:or)?|warn(?:ing)?|info|notice|debug|trace)\b/i
+function levelOf(line) {
+  const m = LEVEL_WORD.exec(line)
+  if (m) {
+    const w = m[1].toLowerCase()
+    if (w.startsWith('warn')) return 'warn'
+    if (w === 'info' || w === 'notice') return 'info'
+    if (w === 'debug' || w === 'trace') return 'other'
+    return 'error'
+  }
+  return /exception|traceback|panic/i.test(line) ? 'error' : 'other'
+}
+
+function logQuery() {
+  const l = app.log
+  if (!l.query) return null
+  try {
+    return new RegExp(l.regex ? l.query : l.query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+  } catch {
+    return undefined
+  }
+}
+
+function filteredLines() {
+  const l = app.log
+  const q = logQuery()
+  return l.lines.filter((x) => l.levels.has(x.level) && (!q || (q.lastIndex = 0, q.test(x.text))))
+}
+
+function highlight(text, q) {
+  if (!q) return esc(text)
+  let out = ''
+  let last = 0
+  q.lastIndex = 0
+  for (let m = q.exec(text); m; m = q.exec(text)) {
+    if (!m[0]) {
+      q.lastIndex += 1
+      continue
+    }
+    out += esc(text.slice(last, m.index)) + `<mark>${esc(m[0])}</mark>`
+    last = m.index + m[0].length
+  }
+  return out + esc(text.slice(last))
+}
+
+async function startLog() {
+  const l = app.log
+  if (l.streamId) request('machines.logs.stop', { streamId: l.streamId }).catch(() => {})
+  Object.assign(l, { streamId: null, lines: [], pending: [], ended: false, error: null })
+  renderLogLines()
+  try {
+    const { streamId } = await request('machines.logs.start', { name: l.name, container: l.container, tail: l.tail, timestamps: l.timestamps })
+    l.streamId = streamId
+  } catch (e) {
+    l.error = e.message || String(e)
+    renderLogLines()
+  }
+}
+
+function openLog(name, container) {
+  app.log = {
+    name,
+    container,
+    streamId: null,
+    lines: [],
+    pending: [],
+    query: '',
+    regex: false,
+    levels: new Set(LEVELS.map((x) => x[0])),
+    follow: true,
+    wrap: true,
+    timestamps: false,
+    tail: 300,
+    paused: false,
+    ended: false,
+    error: null
+  }
+  renderDetail()
+  startLog()
+}
+
+function closeLog() {
+  if (app.log?.streamId) request('machines.logs.stop', { streamId: app.log.streamId }).catch(() => {})
+  app.log = null
+  renderDetail()
+}
+
+function addLines(raw) {
+  const l = app.log
+  const lines = raw.map((t) => {
+    const text = t.replace(ANSI, '')
+    return { text, level: levelOf(text) }
+  })
+  if (l.paused) l.pending.push(...lines)
+  else l.lines.push(...lines)
+  if (l.lines.length > 5000) l.lines.splice(0, l.lines.length - 5000)
+}
+
+function logView() {
+  const l = app.log
+  const toggle = (act, on, label, extra = '') =>
+    `<button class="toggle" data-act="${act}" aria-pressed="${on}" data-augmented-ui="tl-clip br-clip border" ${extra}>${label}</button>`
+  return `<div class="stack logview">
+    <div class="toolbar">
+      <button class="btn" data-act="log-back">${icon('close')} ${esc(l.container)}</button>
+      <button class="btn" data-act="log-term" data-augmented-ui="tl-clip br-clip border" title="Open these logs in an Orca terminal">${icon('terminal')} Terminal</button>
+    </div>
+    <div class="searchrow">
+      <input id="log-q" type="search" placeholder="Search logs" aria-label="Search logs" value="${esc(l.query)}" />
+      ${toggle('log-regex', l.regex, '.*', 'title="Treat the search as a regular expression"')}
+    </div>
+    <div class="toolbar">
+      <span class="levels">${LEVELS.map(([k, label, t]) => `<button class="toggle t-${t}" data-act="log-level" data-level="${k}" aria-pressed="${l.levels.has(k)}" data-augmented-ui="tl-clip br-clip border">${label}</button>`).join('')}</span>
+      <span id="log-count" class="muted num"></span>
+    </div>
+    <div class="toolbar">
+      <span class="levels">
+        ${toggle('log-follow', l.follow, 'Follow')}${toggle('log-wrap', l.wrap, 'Wrap')}${toggle('log-ts', l.timestamps, 'Timestamps')}
+      </span>
+      <span class="sort"><span class="muted">Lines</span>${[100, 300, 1000, 5000]
+        .map((n) => `<button aria-pressed="${l.tail === n}" data-act="log-tail" data-tail="${n}">${n}</button>`)
+        .join('')}</span>
+    </div>
+    <div class="toolbar">
+      <span class="levels">
+        <button class="btn" data-act="log-pause" data-augmented-ui="tl-clip br-clip border">${l.paused ? 'Resume' : 'Pause'}</button>
+        <button class="btn" data-act="log-copy" data-augmented-ui="tl-clip br-clip border">${icon('logs')} Copy</button>
+        <button class="btn" data-act="log-save" data-augmented-ui="tl-clip br-clip border">Download</button>
+        <button class="btn" data-act="log-clear" data-augmented-ui="tl-clip br-clip border">Clear</button>
+      </span>
+    </div>
+    <div id="log-box" class="logbox frame${l.wrap ? '' : ' nowrap'}" data-augmented-ui="tl-clip br-clip border" tabindex="0" aria-label="Log lines"></div>
+  </div>`
+}
+
+function renderLogLines() {
+  const l = app.log
+  const box = $('log-box')
+  if (!l || !box) return
+  const q = logQuery()
+  const shown = filteredLines()
+  const tail = shown.slice(-2000)
+  box.innerHTML = tail.length
+    ? tail.map((x) => `<div class="ln lv-${x.level}">${highlight(x.text, q)}</div>`).join('')
+    : `<p class="muted">${l.error ? esc(l.error) : l.ended ? 'The log stream ended.' : l.streamId ? 'Waiting for log lines.' : 'Connecting.'}</p>`
+  const count = $('log-count')
+  if (count) {
+    const bad = q === undefined ? ', bad pattern' : ''
+    count.textContent = `${shown.length.toLocaleString('en')} of ${l.lines.length.toLocaleString('en')} lines${l.paused && l.pending.length ? `, ${l.pending.length} waiting` : ''}${l.ended ? ', ended' : ''}${bad}`
+  }
+  if (l.follow && !l.paused) box.scrollTop = box.scrollHeight
+}
+
+orca.plugin.on('machines.logLines', (p) => {
+  const l = app.log
+  if (!l || p.streamId !== l.streamId) return
+  if (p.lines.length) addLines(p.lines)
+  if (p.ended) {
+    l.ended = true
+    l.error = p.error || null
+  }
+  renderLogLines()
+})
+
+setInterval(() => {
+  const l = app.log
+  if (l?.streamId && !l.ended) request('machines.logs.ping', { streamId: l.streamId }).catch(() => {})
+}, 15000)
+
+window.addEventListener('pagehide', () => {
+  if (app.log?.streamId) request('machines.logs.stop', { streamId: app.log.streamId }).catch(() => {})
+})
+
+function logAction(act, el) {
+  const l = app.log
+  if (!l) return false
+  if (act === 'log-back') closeLog()
+  else if (act === 'log-term') terminal(l.name, 'logs', l.container)
+  else if (act === 'log-regex') {
+    l.regex = !l.regex
+    el.setAttribute('aria-pressed', String(l.regex))
+    renderLogLines()
+  } else if (act === 'log-level') {
+    const k = el.dataset.level
+    if (l.levels.has(k)) l.levels.delete(k)
+    else l.levels.add(k)
+    el.setAttribute('aria-pressed', String(l.levels.has(k)))
+    renderLogLines()
+  } else if (act === 'log-follow') {
+    l.follow = !l.follow
+    el.setAttribute('aria-pressed', String(l.follow))
+    renderLogLines()
+  } else if (act === 'log-wrap') {
+    l.wrap = !l.wrap
+    el.setAttribute('aria-pressed', String(l.wrap))
+    $('log-box')?.classList.toggle('nowrap', !l.wrap)
+  } else if (act === 'log-ts') {
+    l.timestamps = !l.timestamps
+    el.setAttribute('aria-pressed', String(l.timestamps))
+    startLog()
+  } else if (act === 'log-tail') {
+    l.tail = Number(el.dataset.tail)
+    renderDetail()
+    startLog()
+  } else if (act === 'log-pause') {
+    l.paused = !l.paused
+    if (!l.paused) {
+      l.lines.push(...l.pending)
+      l.pending = []
+    }
+    el.textContent = l.paused ? 'Resume' : 'Pause'
+    renderLogLines()
+  } else if (act === 'log-copy') {
+    const text = filteredLines().map((x) => x.text).join('\n')
+    navigator.clipboard?.writeText(text).then(
+      () => notify('green', `Copied ${filteredLines().length} lines.`),
+      () => notify('yellow', 'This panel cannot reach the clipboard; use Download instead.')
+    )
+  } else if (act === 'log-save') {
+    const text = filteredLines().map((x) => x.text).join('\n')
+    orca.files
+      .saveAs({ suggestedName: `${l.container}.log`, mimeType: 'text/plain', data: text })
+      .catch((e) => notify('red', e.message || String(e)))
+  } else if (act === 'log-clear') {
+    l.lines = []
+    l.pending = []
+    renderLogLines()
+  } else return false
+  return true
+}
+
 // ----- events -----
 
 document.addEventListener('click', (ev) => {
@@ -489,7 +744,9 @@ document.addEventListener('click', (ev) => {
   if (!el) return
   const m = current()
   const act = el.dataset.act
+  if (logAction(act, el)) return
   if (act === 'select') {
+    if (app.log) closeLog()
     app.selected = el.dataset.name
     app.chargeUntil = Date.now() + 900
     saveView()
@@ -497,12 +754,18 @@ document.addEventListener('click', (ev) => {
     const sel = current()
     if (sel && sel.state === 'online') openTab(sel.name, app.tabs[sel.name] || 'overview')
     else renderDetail()
-  } else if (act === 'tab' && m) openTab(m.name, el.dataset.tab)
+  } else if (act === 'tab' && m) {
+    if (app.log) {
+      request('machines.logs.stop', { streamId: app.log.streamId }).catch(() => {})
+      app.log = null
+    }
+    openTab(m.name, el.dataset.tab)
+  }
   else if (act === 'shell' && m) terminal(m.name, 'shell')
   else if (act === 'pick' && m) {
     app.picked[m.name] = app.picked[m.name] === el.dataset.c ? null : el.dataset.c
     renderDetail()
-  } else if (act === 'logs' && m) terminal(m.name, 'logs', app.picked[m.name])
+  } else if (act === 'logs' && m) openLog(m.name, app.picked[m.name])
   else if (act === 'cshell' && m) terminal(m.name, 'shell', app.picked[m.name])
   else if (act === 'sort') {
     app.sort = el.dataset.sort
@@ -537,7 +800,10 @@ document.addEventListener('click', (ev) => {
 })
 
 document.addEventListener('input', (ev) => {
-  if (ev.target.id === 'filter') {
+  if (ev.target.id === 'log-q' && app.log) {
+    app.log.query = ev.target.value
+    renderLogLines()
+  } else if (ev.target.id === 'filter') {
     app.filter = ev.target.value
     renderDetail()
   } else if (ev.target.id === 'hosts-text') app.draft = ev.target.value
@@ -560,6 +826,7 @@ orca.plugin.on('machines.update', (p) => {
   renderHosts()
   const m = current()
   // The Overview follows every frame; the other tabs keep their own data and are left alone while you work in them.
+  if (app.log && m && app.log.name === m.name) return
   if (!m || m.state !== 'online' || (app.tabs[m.name] || 'overview') === 'overview' || !document.querySelector('#tab-body')) renderDetail()
 })
 

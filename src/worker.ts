@@ -40,6 +40,8 @@ const DISK_FRESH_MS = 60 * 60_000
 const live = new Set<Session>()
 /** Repeating timers, cleared by deactivate. */
 const timers = new Set<ReturnType<typeof setInterval>>()
+/** ssh processes following container logs, killed by deactivate. */
+const logChildren = new Set<ChildProcess>()
 
 /**
  * The ssh program to run. On Windows, the OpenSSH ssh.exe that ships with Windows exits with code 255 right away
@@ -571,6 +573,75 @@ export default function activate(orca: OrcaWorkerApi): void {
   }, 60_000)
   timers.add(diskTimer)
 
+  /**
+   * Log streams for the panel's log viewer: one ssh process running `docker logs -f` per stream. Lines are batched
+   * and posted twice a second to the panel that asked, at most 400 per post, because Orca caps posts at 256 KiB and
+   * 200 per 10 seconds. A stream whose panel stops pinging is closed, so a closed panel leaves nothing running.
+   */
+  type LogStream = { child: ChildProcess; panel: string; lines: string[]; partial: string; lastPing: number; ended: boolean; error?: string }
+  const streams = new Map<string, LogStream>()
+  const LOG_LINE_MAX = 4000
+
+  const flushLogs = () => {
+    const now = Date.now()
+    for (const [id, st] of streams) {
+      if (now - st.lastPing > 45_000) st.child.kill()
+      while (st.lines.length) orca.panels.post('machines.logLines', { streamId: id, lines: st.lines.splice(0, 400) }, { panel: st.panel })
+      if (st.ended) {
+        orca.panels.post('machines.logLines', { streamId: id, lines: [], ended: true, ...(st.error ? { error: st.error } : {}) }, { panel: st.panel })
+        streams.delete(id)
+      }
+    }
+  }
+  timers.add(setInterval(flushLogs, 500))
+
+  orca.panels.handle('machines.logs.start', async ({ name, container, tail, timestamps }, context) => {
+    const s = await find(name)
+    if (!isContainerName(container)) throw Object.assign(new Error(`Container name "${container}" has unexpected characters.`), { code: 'invalid_params' })
+    const lines = Math.min(5000, Math.max(10, Math.floor(Number(tail) || 300)))
+    const remote = `docker logs -f --tail ${lines}${timestamps ? ' --timestamps' : ''} ${container} 2>&1`
+    const child = spawn(sshProgram(settings.ssh), [...SSH_OPTIONS, ...sshTargetArgs(s.target), remote], { windowsHide: true })
+    const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+    const st: LogStream = { child, panel: context.panel.id, lines: [], partial: '', lastPing: Date.now(), ended: false }
+    streams.set(id, st)
+    logChildren.add(child)
+    let err = ''
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (chunk) => {
+      const parts = (st.partial + chunk).split('\n')
+      st.partial = parts.pop() ?? ''
+      for (const line of parts) st.lines.push(line.replace(/\r$/, '').slice(0, LOG_LINE_MAX))
+      // A runaway log never fills the worker's memory: keep the newest lines only.
+      if (st.lines.length > 5000) st.lines.splice(0, st.lines.length - 5000)
+    })
+    child.stderr.on('data', (chunk) => (err = (err + chunk).slice(-1000)))
+    child.stdin.on('error', () => {})
+    child.on('error', (e) => {
+      st.ended = true
+      st.error = e.message
+    })
+    child.on('close', (code) => {
+      logChildren.delete(child)
+      if (st.partial) st.lines.push(st.partial)
+      st.ended = true
+      if (code && code !== 143 && !st.error) st.error = lastLine(err) || `ssh exited with code ${code}.`
+    })
+    child.stdin.end('')
+    return { streamId: id }
+  })
+
+  orca.panels.handle('machines.logs.ping', async ({ streamId }) => {
+    const st = streams.get(streamId)
+    if (st) st.lastPing = Date.now()
+    return { alive: !!st && !st.ended }
+  })
+
+  orca.panels.handle('machines.logs.stop', async ({ streamId }) => {
+    streams.get(streamId)?.child.kill()
+    return { ok: true as const }
+  })
+
   orca.panels.handle('machines.terminal', async ({ name, container, kind }) => {
     const s = await find(name)
     if (!isTarget(s.target)) throw Object.assign(new Error(`SSH target "${s.target}" has unexpected characters.`), { code: 'invalid_params' })
@@ -601,4 +672,6 @@ export function deactivate(): void {
   for (const s of [...live]) s.stop()
   for (const t of timers) clearInterval(t)
   timers.clear()
+  for (const c of logChildren) c.kill()
+  logChildren.clear()
 }

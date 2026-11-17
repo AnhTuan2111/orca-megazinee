@@ -587,6 +587,74 @@ textarea {
   opacity: 0.8;
 }
 
+/* Log viewer */
+.searchrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s1);
+}
+
+.levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+}
+
+.toggle {
+  --aug-tl: 4px;
+  --aug-br: 4px;
+  --aug-border-all: 1px;
+  --aug-border-bg: var(--line);
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.toggle[aria-pressed='true'] {
+  --aug-border-bg: var(--tone, var(--blue));
+  color: var(--tone, var(--text));
+  font-weight: 600;
+}
+
+.logbox {
+  max-height: 62vh;
+  overflow: auto;
+  font: 11.5px/1.5 var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.logbox.nowrap {
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.ln {
+  padding: 0 var(--s1);
+  border-left: 2px solid transparent;
+}
+
+.ln.lv-error {
+  color: var(--red);
+  border-left-color: var(--red);
+}
+
+.ln.lv-warn {
+  color: var(--yellow);
+  border-left-color: var(--yellow);
+}
+
+.ln.lv-other {
+  color: var(--muted);
+}
+
+/* Search hits: the matched text is lit in yellow, like a highlighter. */
+mark {
+  color: var(--bg);
+  background: var(--yellow);
+  padding: 0 1px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .charge .cell.on {
     animation: none;
