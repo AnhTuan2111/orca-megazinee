@@ -16,6 +16,7 @@ import {
   parseContainers,
   parseDisk,
   parseHosts,
+  sshTargetArgs,
   streamScript,
   type Counters
 } from './parse'
@@ -168,7 +169,7 @@ class Session {
     this.buffer = ''
     this.stderr = ''
     this.counters = {}
-    const child = spawn(sshProgram(this.settings.ssh), [...SSH_OPTIONS, this.target, 'sh', '-s'], { windowsHide: true })
+    const child = spawn(sshProgram(this.settings.ssh), [...SSH_OPTIONS, ...sshTargetArgs(this.target), 'sh', '-s'], { windowsHide: true })
     this.child = child
     child.stdout.setEncoding('utf8')
     child.stderr.setEncoding('utf8')
@@ -249,7 +250,7 @@ class Session {
 /** Runs a script once on the target over its own SSH connection and returns stdout. */
 function runOnce(ssh: string, target: string, script: string, timeoutMs: number): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(ssh, [...SSH_OPTIONS, target, 'sh', '-s'], { windowsHide: true })
+    const child = spawn(ssh, [...SSH_OPTIONS, ...sshTargetArgs(target), 'sh', '-s'], { windowsHide: true })
     child.stdout.setEncoding('utf8')
     child.stderr.setEncoding('utf8')
     let out = ''
@@ -296,10 +297,32 @@ export function gauge(percent: number): string {
 
 const levelPaint: Record<Level, Paint> = { ok: 'success', warning: 'warning', danger: 'danger' }
 
+/** Orca refuses a status bar tooltip over this many characters, and then keeps the item's old text. */
+const TOOLTIP_MAX = 256
+
+/** Joins summary lines, worst first, as far as they fit, and counts the rest as "+N more". */
+export function fitTooltip(lines: string[]): string {
+  const out: string[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const rest = lines.length - i - 1
+    const tail = rest ? `\n+${rest} more` : ''
+    const line = lines[i].length > TOOLTIP_MAX ? `${lines[i].slice(0, TOOLTIP_MAX - 20)}...` : lines[i]
+    if ([...out, line].join('\n').length + tail.length > TOOLTIP_MAX) {
+      out.push(`+${lines.length - i} more`)
+      break
+    }
+    out.push(line)
+  }
+  return out.join('\n')
+}
+
 /** The status bar item shows the worst machine: offline first, then over a threshold, then the first one. */
 export function statusFor(machines: Machine[]): { text: string; tone: Paint | 'neutral'; tooltip: string; visible: boolean } {
   if (!machines.length) return { text: 'Megazinee', tone: 'neutral', tooltip: 'No machines yet.', visible: false }
-  const rank = (m: Machine) => (m.state === 'offline' ? 3 : { ok: 0, warning: 1, danger: 2 }[levelOf(m)])
+  // The level decides first (offline, red, yellow, fine); within a level the highest of CPU, RAM and disk wins,
+  // so a machine at 95% disk outranks one at 82% even when both are red.
+  const peak = (m: Machine) => Math.max(0, ...[m.cpuPercent, m.memPercent, m.diskPercent].filter((v): v is number => v !== undefined))
+  const rank = (m: Machine) => (m.state === 'offline' ? 3 : { ok: 0, warning: 1, danger: 2 }[levelOf(m)]) * 1000 + (m.state === 'online' ? peak(m) : 0)
   const worst = machines.reduce((a, b) => (rank(b) > rank(a) ? b : a))
   let text: string
   if (worst.state === 'offline') text = `${worst.name} offline`
@@ -307,7 +330,7 @@ export function statusFor(machines: Machine[]): { text: string; tone: Paint | 'n
   else text = `${worst.name} disk ${gauge(worst.diskPercent ?? 0)} ${round(worst.diskPercent)} · CPU ${round(worst.cpuPercent)}`
   const online = machines.filter((m) => m.state === 'online').length
   if (machines.length > 1) text = `${online}/${machines.length} · ${text}`
-  const tooltip = machines.map(summary).join('\n')
+  const tooltip = fitTooltip([...machines].sort((a, b) => rank(b) - rank(a)).map(summary))
   // The item takes the colour of the worst of its numbers, or of a problem such as an unhealthy container.
   const numbers = [worst.cpuPercent, worst.memPercent, worst.diskPercent].filter((v): v is number => v !== undefined)
   const tone: Paint | 'neutral' =
@@ -503,7 +526,7 @@ export default function activate(orca: OrcaWorkerApi): void {
     if (container !== undefined && !isContainerName(container)) {
       throw Object.assign(new Error(`Container name "${container}" has unexpected characters.`), { code: 'invalid_params' })
     }
-    let command = `ssh -t ${s.target}`
+    let command = `ssh -t ${sshTargetArgs(s.target).join(' ')}`
     let title = s.machine.name
     if (container && kind === 'logs') {
       command += ` docker logs -f --tail 200 ${container}`

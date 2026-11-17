@@ -1,6 +1,6 @@
 // Reads real script output (from an Ubuntu server, numbers trimmed) into numbers.
 import { assert, test } from 'orca/testing'
-import { applyFrame, parseContainers, parseDisk, parseHosts, parseSize, type Counters } from './parse'
+import { applyFrame, parseContainers, parseDisk, parseHosts, parseSize, sshTargetArgs, type Counters } from './parse'
 import type { Machine } from './protocol'
 
 const frame = (lines: string[]) => new Map(lines.map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]))
@@ -46,6 +46,12 @@ test('reads the host list', () => {
     { name: 'web-01', target: 'ubuntu@10.0.0.1' },
     { name: 'u@h2', target: 'u@h2' }
   ])
+})
+
+test('a target may carry a port as user@host:port', () => {
+  assert.deepEqual(sshTargetArgs('quantri@203.0.113.9:9290'), ['-p', '9290', 'quantri@203.0.113.9'])
+  assert.deepEqual(sshTargetArgs('ubuntu@10.0.0.1'), ['ubuntu@10.0.0.1'])
+  assert.deepEqual(sshTargetArgs('web-01'), ['web-01'])
 })
 
 test('reads Docker sizes', () => {

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+- A machine on another SSH port is written as `user@host:port`; the port goes to ssh as `-p`, for Shell too.
+- The status bar no longer sticks with many machines: its tooltip stays under Orca's 256 character limit, worst first,
+  with "+N more" for the rest.
+- When several machines share the worst level, the status bar shows the one with the highest CPU, RAM or disk.
+
 ## 0.2.0
 
 - The plugin is now called Megazinee (id `megazinee`, repository `orca-megazinee`), after its gauges that fill

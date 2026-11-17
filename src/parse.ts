@@ -113,6 +113,21 @@ export function applyFrame(m: Machine, c: Counters, kv: Map<string, string>, now
   if (kv.has('cpu')) m.at = now
 }
 
+/**
+ * Splits an SSH target into what ssh takes as the destination and the `-p` port. `user@host:port` carries a port,
+ * since ssh itself has no way to put one in the destination; a bare IPv6 address (more than one colon) is left whole.
+ */
+export function splitTarget(target: string): { dest: string; port?: string } {
+  const m = /^([^:]+):(\d{1,5})$/.exec(target)
+  return m ? { dest: m[1], port: m[2] } : { dest: target }
+}
+
+/** The ssh arguments that reach a target: `-p port` when it has one, then the destination. */
+export function sshTargetArgs(target: string): string[] {
+  const { dest, port } = splitTarget(target)
+  return port ? ['-p', port, dest] : [dest]
+}
+
 /** Reads the hosts setting: one `name=target` per line; a line without = uses the target as the name. */
 export function parseHosts(text: string): { name: string; target: string }[] {
   return text
