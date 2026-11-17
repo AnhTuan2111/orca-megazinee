@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.0
+
+- A second panel, Megazinee FUI, with the same features drawn as a sci-fi HUD: cut-corner frames from augmented-ui
+  (BSD-2-Clause, in `vendor/augmented-ui`), glowing slanted gauge cells that charge once when a view opens, aligned
+  host numbers, cut chart columns.
+- The FUI panel reads container logs in place: follow, search with highlighted matches and an optional regex, level
+  filters (error, warn, info, other), wrap, timestamps, 100 to 5000 lines, pause, copy, download, and tooltips on
+  every control. The worker streams `docker logs -f` and stops when the view closes.
+- Containers and Disk open at once with the last results, kept in the plugin's storage. Containers always measure
+  again in the background; Disk keeps a report for an hour, and the worker rescans one machine a minute when its
+  report is older, so du rarely runs while you wait. Refresh forces a new scan.
+- "Can be freed" counts only images no container uses and build cache. Docker's own reclaimable figure for images
+  is wrong with the containerd image store (98% while every image had a container), and volumes no container uses
+  can still hold data, so they are listed apart.
+- A container's CPU is a share of the whole machine, like the machine's own gauge: docker stats counts one core as
+  100%, so kafka on two of sixteen cores showed 193% instead of 12%.
+
 ## 0.2.1
 
 - A machine on another SSH port is written as `user@host:port`; the port goes to ssh as `-p`, for Shell too.

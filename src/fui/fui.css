@@ -1,0 +1,665 @@
+/* Hallmark · custom direction: FUI (fictional user interface) · app screen · genre technical · signature: charge gauges */
+/* critique: one idea per screen holds (host list, then one machine); colour means level only; labels sentence case */
+/* waive 48: vendor/augmented-ui/augmented-ui.min.css is the third-party library, kept as shipped (BSD-2-Clause) */
+
+:root {
+  /* Surfaces follow Orca's theme so the panel sits in it; the four level colours are the plugin's own. */
+  --bg: var(--orca-background, #07080a);
+  --panel: var(--orca-card, #0c0e11);
+  --text: var(--orca-foreground, #e8eaed);
+  --muted: var(--orca-muted-foreground, #8f969e);
+  --line: var(--orca-border, #262a31);
+  --focus: var(--orca-ring, #4f9cf9);
+  --green-on-dark: #4ade80;
+  --blue-on-dark: #4f9cf9;
+  --yellow-on-dark: #f5b400;
+  --red-on-dark: #f25f5c;
+  --green-on-light: #15803d;
+  --blue-on-light: #1d5fd0;
+  --yellow-on-light: #a16207;
+  --red-on-light: #c42b28;
+  --gray: #6b7280;
+  --green: var(--green-on-dark);
+  --blue: var(--blue-on-dark);
+  --yellow: var(--yellow-on-dark);
+  --red: var(--red-on-dark);
+  --font: system-ui, 'Segoe UI', Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --cut: 7px;
+}
+
+/* Orca puts a light or dark class on <html>; on a light theme the level colours darken to keep their contrast. */
+:root.light {
+  --green: var(--green-on-light);
+  --blue: var(--blue-on-light);
+  --yellow: var(--yellow-on-light);
+  --red: var(--red-on-light);
+}
+
+html,
+body {
+  overflow-x: clip;
+  /* The panel still scrolls with the wheel and keys; it just draws no scrollbar in the narrow sidebar. */
+  scrollbar-width: none;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.45 var(--font);
+}
+
+/* Empty slots (no notice, editor closed) take no row, so the grid gap does not open a hole under the top bar. */
+main > :empty {
+  display: none;
+}
+
+main {
+  display: grid;
+  gap: var(--s3);
+  padding: var(--s3);
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Level colours: every gauge, number, chip and column takes one of these. */
+.t-green { --tone: var(--green); }
+.t-blue { --tone: var(--blue); }
+.t-yellow { --tone: var(--yellow); }
+.t-red { --tone: var(--red); }
+.t-gray { --tone: var(--gray); }
+.tone { color: var(--tone); }
+
+/* Frames: augmented-ui cuts two corners and draws a one pixel border in the frame's colour. */
+.frame {
+  --aug-tl: var(--cut);
+  --aug-br: var(--cut);
+  --aug-border-all: 1px;
+  --aug-border-bg: var(--tone, var(--line));
+  padding: var(--s2) var(--s3);
+  background: var(--panel);
+}
+
+.frame.lit {
+  --tone: var(--blue);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--blue) 45%, transparent));
+}
+
+/* Line icons from fui.js, drawn in the text colour. */
+.ic {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -2px;
+}
+
+/* Top bar */
+#top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-width: 0;
+}
+
+.brand h1 {
+  text-wrap: balance;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* Chips: an outline in the level colour on the background, square, small. */
+.chip {
+  --aug-tl: 4px;
+  --aug-br: 4px;
+  --aug-border-all: 1px;
+  --aug-border-bg: var(--tone, var(--line));
+  display: inline-flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--tone, var(--muted));
+  white-space: nowrap;
+}
+
+/* Buttons: borderless text with an icon glyph, a cut frame on hover and focus. */
+button {
+  font: inherit;
+  color: var(--text);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.btn {
+  --aug-tl: 5px;
+  --aug-br: 5px;
+  --aug-border-all: 1px;
+  --aug-border-bg: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  font-weight: 600;
+}
+
+.btn:hover {
+  --aug-border-bg: var(--line);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
+.icon-btn {
+  padding: 4px;
+  color: var(--muted);
+}
+
+.icon-btn:hover {
+  color: var(--text);
+}
+
+:focus-visible {
+  outline: 1px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Host list: one cut row per machine. */
+#hosts {
+  display: grid;
+  gap: var(--s1);
+}
+
+.host {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+  width: 100%;
+  text-align: left;
+}
+
+.host .name {
+  font-weight: 700;
+  overflow-wrap: break-word;
+  min-width: 0;
+}
+
+/* Three fixed columns with right-aligned numbers, so CPU, RAM and Disk line up from row to row. */
+.host .stats {
+  display: grid;
+  grid-template-columns: repeat(3, 64px);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.host .stats > .whole {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+
+.host .stat {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s1);
+  padding-left: var(--s2);
+}
+
+/* Detail */
+.detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s2);
+  margin-bottom: var(--s2);
+}
+
+.detail-head h2 {
+  text-wrap: balance;
+  margin: 0;
+  font-size: 14px;
+  overflow-wrap: break-word;
+  min-width: 0;
+}
+
+.detail-head p {
+  margin: 2px 0 0;
+  font-size: 11px;
+}
+
+.tabs {
+  display: flex;
+  gap: var(--s3);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--s3);
+}
+
+.tab {
+  padding: 8px 4px;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.tab[aria-selected='true'] {
+  color: var(--text);
+  border-bottom-color: var(--blue);
+}
+
+.stack {
+  display: grid;
+  gap: var(--s3);
+}
+
+/* The signature: charge gauges. Each cell is a slanted parallelogram; filled cells glow in the level colour and,
+   when a gauge first appears, charge one after another. */
+.meter {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 58px;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.meter .label.alert {
+  color: var(--tone);
+  font-weight: 600;
+}
+
+.meter .value {
+  text-align: right;
+  font-weight: 600;
+}
+
+.gauge {
+  display: inline-flex;
+  gap: 4px;
+  padding-left: 4px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.cell {
+  flex: none;
+  width: 9px;
+  height: 13px;
+  transform: skewX(-18deg);
+  border: 1px solid color-mix(in srgb, var(--muted) 55%, transparent);
+}
+
+.cell.on {
+  background: var(--tone);
+  border-color: var(--tone);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--tone) 55%, transparent);
+}
+
+.charge .cell.on {
+  animation: charge 0.32s calc(var(--i) * 45ms) both;
+}
+
+@keyframes charge {
+  from {
+    opacity: 0;
+    transform: skewX(-18deg) scaleY(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: skewX(-18deg) scaleY(1);
+  }
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1) var(--s3);
+  font-size: 11px;
+}
+
+.legend .swatch {
+  display: inline-block;
+  width: 8px;
+  height: 10px;
+  margin-right: 4px;
+  transform: skewX(-18deg);
+  background: var(--tone);
+}
+
+/* Charts: outlined columns in the level colour. */
+.chart-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s2);
+  font-weight: 600;
+}
+
+.chart-head span {
+  font-weight: 400;
+  font-size: 11px;
+}
+
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 96px;
+  padding: 4px;
+}
+
+/* Columns get the same cut corner as every frame, drawn by augmented-ui. */
+.col {
+  --aug-tl: 4px;
+  --aug-border-all: 1px;
+  --aug-border-bg: var(--tone);
+  flex: 1 1 0;
+  min-width: 2px;
+  background: color-mix(in srgb, var(--tone) 18%, transparent);
+}
+
+.col.empty {
+  color: var(--text);
+  height: 2px;
+  background: var(--line);
+  border: 0;
+}
+
+.chart-foot {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px var(--s3);
+  margin: 0;
+}
+
+.kv dt {
+  color: var(--muted);
+}
+
+.kv dd {
+  margin: 0;
+  overflow-wrap: break-word;
+}
+
+/* Containers */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.sort {
+  display: flex;
+  gap: var(--s2);
+  font-size: 12px;
+}
+
+.sort button[aria-pressed='true'] {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.sort button {
+  color: var(--blue);
+  padding: 0;
+}
+
+input[type='search'],
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px;
+  font: inherit;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
+  gap: var(--s1);
+}
+
+.ctile {
+  display: grid;
+  gap: 8px;
+  text-align: left;
+  width: 100%;
+}
+
+.ctile .cname {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.ctile .ccols {
+  display: grid;
+  grid-template-columns: 76px 80px 92px;
+  gap: var(--s1);
+}
+
+.picked {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.picked strong {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+}
+
+/* Disk */
+.freed {
+  --tone: var(--green);
+  color: var(--green);
+  font-weight: 600;
+}
+
+.tree,
+.tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tree ul {
+  padding-left: var(--s4);
+  border-left: 1px solid var(--line);
+  margin-left: 8px;
+}
+
+.tree summary,
+.tree .leaf {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s2);
+  padding: 2px 0 2px 16px;
+  position: relative;
+  cursor: pointer;
+  list-style: none;
+}
+
+.tree summary::-webkit-details-marker {
+  display: none;
+}
+
+/* A slanted cell marks a folder that opens, filled when it is open, like the gauges. */
+.tree summary::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 7px;
+  width: 6px;
+  height: 9px;
+  transform: skewX(-18deg);
+  border: 1px solid var(--muted);
+}
+
+.tree details[open] > summary::before {
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+.tree .leaf {
+  cursor: default;
+}
+
+.docker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: var(--s1);
+}
+
+.section-title {
+  margin: 0 0 var(--s1);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.callout {
+  border-left: 2px solid var(--tone);
+  padding: var(--s1) var(--s3);
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s2);
+}
+
+.skeleton {
+  height: 72px;
+  background: linear-gradient(90deg, var(--panel), color-mix(in srgb, var(--muted) 15%, var(--panel)), var(--panel));
+  opacity: 0.8;
+}
+
+/* Log viewer */
+.searchrow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s1);
+}
+
+.levels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1);
+}
+
+.toggle {
+  --aug-tl: 4px;
+  --aug-br: 4px;
+  --aug-border-all: 1px;
+  --aug-border-bg: var(--line);
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.toggle[aria-pressed='true'] {
+  --aug-border-bg: var(--tone, var(--blue));
+  color: var(--tone, var(--text));
+  font-weight: 600;
+}
+
+.logbox {
+  max-height: 62vh;
+  overflow: auto;
+  font: 11.5px/1.5 var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.logbox.nowrap {
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.ln {
+  padding: 0 var(--s1);
+  border-left: 2px solid transparent;
+}
+
+.ln.lv-error {
+  color: var(--red);
+  border-left-color: var(--red);
+}
+
+.ln.lv-warn {
+  color: var(--yellow);
+  border-left-color: var(--yellow);
+}
+
+.ln.lv-other {
+  color: var(--muted);
+}
+
+/* Search hits: the matched text is lit in yellow, like a highlighter. */
+mark {
+  color: var(--bg);
+  background: var(--yellow);
+  padding: 0 1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .charge .cell.on {
+    animation: none;
+  }
+  .btn:active {
+    transform: none;
+  }
+}

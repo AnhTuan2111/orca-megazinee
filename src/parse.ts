@@ -200,7 +200,7 @@ export function parseContainers(output: string): Container[] {
 
 /**
  * Measures disk once. Each line starts with a letter for its kind: F filesystem, K docker system df, D directory,
- * L container log, N container name. du scans each top-level directory in parallel, two levels deep, at most 75
+ * L container log, N container name, I image and its size, U an image some container uses. du scans each top-level directory in parallel, two levels deep, at most 75
  * seconds each, because on a server with many files one pass over / takes minutes; /var/lib/docker is skipped since
  * docker system df covers it. du and the log read use sudo when the SSH user has passwordless sudo, since many
  * directories are root-only; timeout must come after sudo, before it cannot stop du. The script only reads.
@@ -224,6 +224,8 @@ if command -v docker >/dev/null 2>&1; then
   elif [ $rc -eq 124 ]; then printf "KERR\ttimeout\n"
   else printf "KERR\t%s\n" "$(printf "%s" "$out" | tail -1)"; fi
   timeout 10 docker ps -a --no-trunc --format "{{.ID}}\t{{.Names}}" 2>/dev/null | sed "s/^/N\t/"
+  timeout 10 docker images --no-trunc --format "{{.ID}}\t{{.Size}}" 2>/dev/null | sed "s/^/I\t/"
+  ids=$(docker ps -aq); [ -n "$ids" ] && timeout 10 docker inspect -f "{{.Image}}" $ids 2>/dev/null | sort -u | sed "s/^/U\t/"
 fi
 $S timeout 10 sh -c 'du -k /var/lib/docker/containers/*/*-json.log 2>/dev/null' | sort -rn | head -5 | sed "s/^/L\t/"
 wait
@@ -233,6 +235,8 @@ export function parseDisk(output: string, at: number): DiskReport {
   const report: DiskReport = { at, filesystems: [], dirs: [], logs: [], sudo: false, dirsPartial: false }
   const names = new Map<string, string>()
   const logs: { id: string; bytes: number }[] = []
+  const images = new Map<string, number>()
+  const usedImages = new Set<string>()
   for (const line of output.split(/\r?\n/)) {
     if (line === 'sudo=1') report.sudo = true
     const [kind, ...f] = line.split('\t')
@@ -256,6 +260,11 @@ export function parseDisk(output: string, at: number): DiskReport {
       if (f[0] === '124') report.dirsPartial = true
     } else if (kind === 'N') {
       if (f[0] && f[1]) names.set(f[0], f[1])
+    } else if (kind === 'I') {
+      const size = parseSize(f[1] ?? '')
+      if (f[0] && size !== undefined) images.set(f[0], size)
+    } else if (kind === 'U') {
+      if (f[0]) usedImages.add(f[0])
     } else if (kind === 'L') {
       const id = /containers\/([0-9a-f]{64})\//.exec(f[1] ?? '')?.[1]
       if (id) logs.push({ id, bytes: Number(f[0]) * 1024 })
@@ -264,5 +273,14 @@ export function parseDisk(output: string, at: number): DiskReport {
   report.filesystems.sort((a, b) => b.sizeBytes - a.sizeBytes)
   report.dirs = report.dirs.sort((a, b) => b.bytes - a.bytes).slice(0, 12)
   report.logs = logs.map((l) => ({ container: names.get(l.id) ?? l.id.slice(0, 12), bytes: l.bytes }))
+  // docker system df gets the reclaimable images wrong with the containerd image store (it said 98% while every
+  // image had a container), so count the images no container uses ourselves. Shared layers make this an upper bound.
+  if (images.size) {
+    let unused = 0
+    for (const [id, size] of images) if (!usedImages.has(id)) unused += size
+    report.unusedImageBytes = unused
+    const row = report.docker?.find((d) => d.type === 'Images')
+    if (row) row.reclaimableBytes = Math.min(unused, row.sizeBytes)
+  }
   return report
 }

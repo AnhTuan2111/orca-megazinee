@@ -10,6 +10,12 @@ orca plugin install AnhTuan2111/orca-megazinee
 
 Notifications when a machine goes offline, disk or RAM passes 80%, CPU stays above 80%, or a container fails.
 
+## Two panels
+
+**Megazinee** uses Orca's own controls. **Megazinee FUI** draws the same features as a sci-fi HUD with cut-corner
+frames and glowing gauges, and reads container logs in place: follow, search with highlights, level filters, pause,
+copy, download.
+
 ## Four colours
 
 <img src="docs/colors.svg" width="100%" alt="Green below 50%, blue from 50 to 69%, yellow from 70 to 79%, red from 80%">
@@ -24,6 +30,10 @@ monitor=admin@10.0.0.2:2222
 ```
 
 On Windows the plugin uses Git for Windows' `ssh.exe`.
+
+## Credits
+
+Cut-corner frames by [augmented-ui](https://github.com/propjockey/augmented-ui) (BSD-2-Clause, `vendor/augmented-ui`).
 
 ## Develop
 

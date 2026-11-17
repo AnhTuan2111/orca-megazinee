@@ -78,6 +78,9 @@ async function loadSnapshot(): Promise<void> {
 
 export function setup(ctx: PanelContext): void {
   ctx.subscriptions.push(plugin.on('machines.update', (p) => set(machines, p.machines)))
+  ctx.subscriptions.push(
+    plugin.on('machines.diskReport', (p) => set(diskBy, { ...read(diskBy), [p.name]: { loading: false, data: p.report } }))
+  )
   void loadSnapshot()
 }
 
@@ -100,8 +103,23 @@ async function saveHosts(): Promise<void> {
   })
 }
 
+/** Fills a tab from the worker's stored results when the panel has nothing yet, so it shows data at once. */
+async function fromCache(name: string): Promise<void> {
+  if (read(containersBy)[name]?.data && read(diskBy)[name]?.data) return
+  const cached = await plugin.request('machines.cached', { name }).catch(() => null)
+  if (!cached) return
+  if (cached.containers && !read(containersBy)[name]?.data) {
+    set(containersBy, { ...read(containersBy), [name]: { loading: !!read(containersBy)[name]?.loading, data: cached.containers } })
+  }
+  if (cached.disk && !read(diskBy)[name]?.data) {
+    set(diskBy, { ...read(diskBy), [name]: { loading: !!read(diskBy)[name]?.loading, data: cached.disk } })
+  }
+}
+
+/** Containers change by the second, so opening the tab shows the stored list at once and always measures again. */
 async function loadContainers(name: string): Promise<void> {
   set(containersBy, { ...read(containersBy), [name]: { loading: true, data: read(containersBy)[name]?.data } })
+  await fromCache(name)
   try {
     const data = await plugin.request('machines.containers', { name }, { timeoutMs: 60_000 })
     set(containersBy, { ...read(containersBy), [name]: { loading: false, data } })
@@ -110,8 +128,12 @@ async function loadContainers(name: string): Promise<void> {
   }
 }
 
-async function loadDisk(name: string): Promise<void> {
-  set(diskBy, { ...read(diskBy), [name]: { loading: true, data: read(diskBy)[name]?.data } })
+/** Disk changes slowly: a stored report under an hour old is shown as is, unless Refresh forces a new scan. */
+async function loadDisk(name: string, force = false): Promise<void> {
+  await fromCache(name)
+  const have = read(diskBy)[name]?.data
+  if (!force && have && Date.now() - have.at < 60 * 60_000) return
+  set(diskBy, { ...read(diskBy), [name]: { loading: true, data: have } })
   try {
     const data = await plugin.request('machines.disk', { name }, { timeoutMs: 120_000 })
     set(diskBy, { ...read(diskBy), [name]: { loading: false, data } })
@@ -125,8 +147,9 @@ const loadTab = (name: string, tab: TabId) =>
 
 function openTab(name: string, tab: TabId): void {
   set(tabs, { ...read(tabs), [name]: tab })
+  // Every open measures Containers again; Disk decides for itself whether its stored report is fresh enough.
   const loaded = tab === 'containers' ? read(containersBy)[name] : tab === 'disk' ? read(diskBy)[name] : undefined
-  if (tab !== 'overview' && !loaded?.data && !loaded?.loading) void loadTab(name, tab)
+  if (tab !== 'overview' && !loaded?.loading) void loadTab(name, tab)
 }
 
 function selectHost(m: Machine): void {
@@ -451,8 +474,11 @@ const CONTAINER_PAGE = 12
  * line up across every tile, one column wide or in a grid. RAM is always in GiB so its chips are one width. In a very
  * narrow sidebar the chips wrap, column by column.
  */
-function ContainerTile(props: { name: string; c: Container; selected: boolean }) {
+function ContainerTile(props: { name: string; c: Container; selected: boolean; cpus?: number }) {
   const { name, c, selected } = props
+  // docker stats counts one core as 100%, so a container on two cores reads 200%. Divide by the machine's cores to
+  // put it on the same scale as the machine's own CPU gauge.
+  const cpu = c.cpuPercent === undefined ? undefined : c.cpuPercent / (props.cpus || 1)
   const state = containerState(c)
   return (
     <Box gap="xs" padding="xs" radius="none" border={selected ? 'accent' : true} align="start">
@@ -470,7 +496,7 @@ function ContainerTile(props: { name: string; c: Container; selected: boolean })
           <Chip tone={state.tone}>{state.label}</Chip>
         </Box>
         <Box direction="row" width={76}>
-          {c.cpuPercent !== undefined ? <Chip tone={barTone(c.cpuPercent)}>{`CPU\u00a0${num(c.cpuPercent)}%`}</Chip> : null}
+          {cpu !== undefined ? <Chip tone={barTone(cpu)}>{`CPU\u00a0${num(cpu)}%`}</Chip> : null}
         </Box>
         <Box direction="row" width={84}>
           {c.memBytes !== undefined ? <Chip>{`RAM\u00a0${num(c.memBytes / 1024 ** 3)}\u00a0GiB`}</Chip> : null}
@@ -587,7 +613,7 @@ function ContainersTab(props: { m: Machine }) {
       ) : null}
       <Grid minItemWidth="lg" gap="xs">
         {shown.map((c) => (
-          <ContainerTile name={name} c={c} selected={selected === c.name} />
+          <ContainerTile name={name} c={c} selected={selected === c.name} cpus={props.m.cpus} />
         ))}
       </Grid>
       {!showAll && list.length > CONTAINER_PAGE ? (
@@ -601,7 +627,7 @@ function ContainersTab(props: { m: Machine }) {
         </Text>
       ) : null}
       <Row justify="between" align="center">
-        <Text muted size="xs">{`measured ${clock(data.at)}`}</Text>
+        <Text muted size="xs">{`measured ${clock(data.at)}${loaded?.loading ? ', updating' : ''}`}</Text>
         <Button variant="ghost" size="sm" icon="refresh" disabled={!!loaded?.loading} onPress={() => loadContainers(name)}>
           Refresh
         </Button>
@@ -662,7 +688,7 @@ function DiskTab(props: { m: Machine }) {
   const { name } = props.m
   const loaded = read(diskBy)[name]
   const report = loaded?.data
-  if (!report || loaded?.loading) {
+  if (!report) {
     if (loaded?.error && !loaded.loading) {
       return (
         <Callout tone="danger" title="Could not measure disk">
@@ -675,7 +701,10 @@ function DiskTab(props: { m: Machine }) {
 
   const root = report.filesystems.find((f) => f.mount === '/') ?? report.filesystems[0]
   const docker = report.docker ?? []
-  const reclaimable = docker.reduce((a, d) => a + d.reclaimableBytes, 0)
+  // Only what is safe to free: images no container uses and build cache. Volumes no container uses can still hold
+  // a database or uploads, so they are shown apart and never counted here.
+  const reclaimable = docker.filter((d) => d.type !== 'Local Volumes').reduce((a, d) => a + d.reclaimableBytes, 0)
+  const looseVolumes = docker.find((d) => d.type === 'Local Volumes')?.reclaimableBytes ?? 0
   const dockerMax = Math.max(1, ...docker.map((d) => d.sizeBytes))
   const size = root?.sizeBytes ?? 0
   const used = root?.usedBytes ?? 0
@@ -707,8 +736,11 @@ function DiskTab(props: { m: Machine }) {
 
       {reclaimable > 0 ? (
         <Callout tone="success" title={`About ${bytes(reclaimable)} can be freed`} icon="check">
-          <Text size="sm">Old images, build cache and volumes no container uses.</Text>
+          <Text size="sm">Images no container uses and build cache.</Text>
         </Callout>
+      ) : null}
+      {looseVolumes > 0 ? (
+        <Text muted size="xs">{`${bytes(looseVolumes)} sit in volumes no container uses. They can hold data, so check each one before deleting.`}</Text>
       ) : null}
 
       <Stack gap="xs">
@@ -732,7 +764,7 @@ function DiskTab(props: { m: Machine }) {
                     { tone: 'success', share: share(d.reclaimableBytes, dockerMax) }
                   ]}
                 />
-                <Text muted size="xs">{`${bytes(d.sizeBytes - d.reclaimableBytes)} in use, ${bytes(d.reclaimableBytes)} reclaimable`}</Text>
+                <Text muted size="xs">{`${bytes(d.sizeBytes - d.reclaimableBytes)} in use, ${bytes(d.reclaimableBytes)} ${d.type === 'Local Volumes' ? 'not attached' : 'reclaimable'}`}</Text>
               </Frame>
             ))}
           </Grid>
@@ -761,8 +793,8 @@ function DiskTab(props: { m: Machine }) {
       ) : null}
 
       <Row justify="between" align="center">
-        <Text muted size="xs">{`measured ${clock(report.at)}`}</Text>
-        <Button variant="ghost" size="sm" icon="refresh" onPress={() => loadDisk(name)}>
+        <Text muted size="xs">{`measured ${clock(report.at)}${loaded?.loading ? ', scanning again' : ''}`}</Text>
+        <Button variant="ghost" size="sm" icon="refresh" disabled={!!loaded?.loading} onPress={() => loadDisk(name, true)}>
           Refresh
         </Button>
       </Row>

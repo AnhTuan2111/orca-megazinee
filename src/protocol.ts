@@ -62,6 +62,8 @@ export type DiskReport = {
   logs: { container: string; bytes: number }[]
   /** Whether du ran with sudo; without it, directories the SSH user cannot read are undercounted. */
   sudo: boolean
+  /** Bytes of images no container uses, counted from docker images and the containers' image ids. */
+  unusedImageBytes?: number
 }
 
 declare module 'orca' {
@@ -74,7 +76,12 @@ declare module 'orca' {
     'machines.reconnect': { output: { ok: true } }
     /** Runs docker stats and docker ps over a separate SSH connection. Slow, so only on demand. */
     'machines.containers': { input: { name: string }; output: { at: number; containers: Container[] } }
-    /** Measures where disk space goes. Slow, so only on demand. */
+    /** The last Containers and Disk results kept in storage, so a tab shows something at once. */
+    'machines.cached': {
+      input: { name: string }
+      output: { containers: { at: number; containers: Container[] } | null; disk: DiskReport | null }
+    }
+    /** Measures where disk space goes. Slow (du), so the worker also runs it in the background once an hour. */
     'machines.disk': { input: { name: string }; output: DiskReport }
     /** Opens an Orca terminal running ssh into the machine, or docker logs, docker exec of a container. */
     'machines.terminal': {
@@ -82,9 +89,21 @@ declare module 'orca' {
       /** Set when the orca CLI failed and the terminal runs in the background without a tab: why it failed. */
       output: { ok: true; background?: string }
     }
+    /** Starts following a container's logs; lines arrive as machines.logLines posts to the asking panel. */
+    'machines.logs.start': {
+      input: { name: string; container: string; tail: number; timestamps: boolean }
+      output: { streamId: string }
+    }
+    /** Keeps a log stream alive; one the panel stops pinging for 45 seconds is closed. */
+    'machines.logs.ping': { input: { streamId: string }; output: { alive: boolean } }
+    'machines.logs.stop': { input: { streamId: string }; output: { ok: true } }
   }
   interface PluginPanelEvents {
     /** Sent by the worker on every new frame or connection state change. */
     'machines.update': { machines: Machine[] }
+    /** A disk report the worker measured in the background. */
+    'machines.diskReport': { name: string; report: DiskReport }
+    /** New log lines of a stream; ended is set once the stream stops, with error when ssh or docker failed. */
+    'machines.logLines': { streamId: string; lines: string[]; ended?: boolean; error?: string }
   }
 }

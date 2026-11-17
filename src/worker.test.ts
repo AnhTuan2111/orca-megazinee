@@ -83,6 +83,37 @@ test('with no machines the snapshot is empty and the status bar item hidden', as
   await w.deactivate()
 })
 
+test('the worker hands back the stored Containers and Disk results', async () => {
+  const stored = { containers: { 'web-01': { at: 5, containers: [] } }, disk: {} }
+  const host = mockHost({
+    capabilities: ['settings:own', 'storage:own', 'notifications:show', 'workspace:read', 'terminal:send'],
+    settings: { hosts: 'web-01=127.0.0.1' },
+    storage: { cache: stored }
+  })
+  const w = await mountWorker(worker, { host })
+  const answer = await w.request('machines.cached', { name: 'web-01' })
+  assert.deepEqual(answer.containers, { at: 5, containers: [] })
+  assert.equal(answer.disk, null)
+  await w.deactivate()
+})
+
+test('a log stream reports when ssh fails, and an odd container name is refused', async () => {
+  const host = mockHost({
+    capabilities: ['settings:own', 'storage:own', 'notifications:show', 'workspace:read', 'terminal:send'],
+    settings: { hosts: 'x=127.0.0.1:1' }
+  })
+  const w = await mountWorker(worker, { host })
+  await assert.rejects(w.request('machines.logs.start', { name: 'x', container: 'a; rm -rf /', tail: 100, timestamps: false }), /unexpected characters/)
+  const { streamId } = await w.request('machines.logs.start', { name: 'x', container: 'web', tail: 100, timestamps: false }, { panel: 'p1' })
+  // Port 1 refuses at once; the worker posts the end of the stream with ssh's error within a flush or two.
+  for (let i = 0; i < 40 && !w.posts.some((p) => p.event === 'machines.logLines'); i++) await new Promise((r) => setTimeout(r, 250))
+  const end = w.posts.find((p) => p.event === 'machines.logLines') as { payload: { streamId: string; ended?: boolean; error?: string } } | undefined
+  assert.equal(end?.payload.streamId, streamId)
+  assert.equal(end?.payload.ended, true)
+  assert.ok(end?.payload.error, 'no error text')
+  await w.deactivate()
+})
+
 test('an odd container name opens no terminal', async () => {
   const host = mockHost({
     capabilities: ['settings:own', 'workspace:read', 'terminal:send'],

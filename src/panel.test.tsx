@@ -13,6 +13,7 @@ const hostWith = (machines: Machine[]) =>
       'machines.snapshot': () => ({ machines, hosts: 'web-01=ubuntu@10.0.0.1', sampleSeconds: 2 }),
       'machines.containers': () => containers,
       'machines.disk': () => disk,
+      'machines.cached': () => ({ containers: null, disk: null }),
       'machines.terminal': (input: unknown) => {
         // Orca rejects input with a field set to undefined; the panel must leave the field out.
         assert.ok(!Object.values(input as object).includes(undefined), JSON.stringify(input))
@@ -78,6 +79,35 @@ test('the Disk tab has the disk map, what can be freed and the directory tree', 
   assert.ok(text.includes('"type":"Tree"'), 'no directory tree')
   assert.deepEqual(view.errors, [])
   assert.deepEqual(view.warnings, [])
+  await view.unmount()
+})
+
+test('container CPU is a share of the whole machine, not of one core', async () => {
+  const view = await mount(panel, { host: hostWith([machine]) })
+  await view.select({ label: 'View web-01' }, 'containers')
+  // kafka reads 93.2% in docker stats on a 16 core machine: 5.8% of the machine.
+  assert.ok(JSON.stringify(view.tree()).includes(`CPU${NBSP}5.8%`))
+  await view.unmount()
+})
+
+test('a disk report under an hour old opens at once without a new scan', async () => {
+  let scans = 0
+  const host = mockHost({
+    requests: {
+      'machines.snapshot': () => ({ machines: [machine], hosts: '', sampleSeconds: 2 }),
+      'machines.cached': () => ({ containers: null, disk: { ...disk, at: Date.now() - 10 * 60_000 } }),
+      'machines.disk': () => {
+        scans += 1
+        return disk
+      }
+    }
+  })
+  const view = await mount(panel, { host })
+  await view.select({ label: 'View web-01' }, 'disk')
+  assert.ok(JSON.stringify(view.tree()).includes('can be freed'))
+  assert.equal(scans, 0)
+  await view.press({ text: 'Refresh' })
+  assert.equal(scans, 1)
   await view.unmount()
 })
 

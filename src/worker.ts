@@ -20,7 +20,7 @@ import {
   streamScript,
   type Counters
 } from './parse'
-import type { Machine } from './protocol'
+import type { Container, DiskReport, Machine } from './protocol'
 
 const STATUS_ITEM = 'megazinee'
 /** How long a machine must stay unreachable before we notify, so a short network blip stays quiet. */
@@ -30,8 +30,18 @@ const CPU_ALERT_MS = 60_000
 
 type Settings = { hosts: string; sampleSeconds: number; ssh: string; alerts: boolean }
 
+/** The last Containers and Disk results per machine name, kept in storage so tabs open with data at once. */
+type Cache = { containers: Record<string, { at: number; containers: Container[] }>; disk: Record<string, DiskReport> }
+
+/** Disk changes slowly and du is slow, so a report counts as fresh for an hour; the worker rescans after that. */
+const DISK_FRESH_MS = 60 * 60_000
+
 /** Every running connection, so deactivate can close them all when Orca stops the worker. */
 const live = new Set<Session>()
+/** Repeating timers, cleared by deactivate. */
+const timers = new Set<ReturnType<typeof setInterval>>()
+/** ssh processes following container logs, killed by deactivate. */
+const logChildren = new Set<ChildProcess>()
 
 /**
  * The ssh program to run. On Windows, the OpenSSH ssh.exe that ships with Windows exits with code 255 right away
@@ -395,6 +405,10 @@ export default function activate(orca: OrcaWorkerApi): void {
   let lastStatus = ''
   /** History per machine name, read from storage when the worker starts. */
   const histories: Record<string, History> = {}
+  let cache: Cache = { containers: {}, disk: {} }
+  const saveCache = () => orca.storage.set('cache', cache).catch((e) => orca.log(`storage.set cache: ${e}`))
+  /** Disk scans in flight, so a tab and the hourly timer never run du twice on one machine. */
+  const diskRuns = new Map<string, Promise<DiskReport>>()
 
   const machines = () => sessions.map((s) => s.machine)
 
@@ -457,9 +471,11 @@ export default function activate(orca: OrcaWorkerApi): void {
       s.stop()
       alerts.forget(s.machine.name)
     }
-    // Drop the history of machines no longer in the list.
+    // Drop the history and cached results of machines no longer in the list.
     const names = new Set(fresh.map((s) => s.machine.name))
     for (const name of Object.keys(histories)) if (!names.has(name)) delete histories[name]
+    for (const name of Object.keys(cache.containers)) if (!names.has(name)) delete cache.containers[name]
+    for (const name of Object.keys(cache.disk)) if (!names.has(name)) delete cache.disk[name]
     sessions = fresh
     changed()
   }
@@ -490,6 +506,10 @@ export default function activate(orca: OrcaWorkerApi): void {
     if (stored && typeof stored === 'object') {
       for (const [name, h] of Object.entries(stored as Record<string, unknown>)) histories[name] = asHistory(h)
     }
+    const cached = (await orca.storage.get('cache').catch(() => null)) as Partial<Cache> | null
+    if (cached && typeof cached === 'object') cache = { containers: cached.containers ?? {}, disk: cached.disk ?? {} }
+    // Reports from before 0.3.0 trusted Docker's reclaimable images, which is wrong with containerd; drop them.
+    for (const [name, r] of Object.entries(cache.disk)) if (r.unusedImageBytes === undefined) delete cache.disk[name]
     await reload()
   })()
 
@@ -509,15 +529,117 @@ export default function activate(orca: OrcaWorkerApi): void {
     return { ok: true as const }
   })
 
+  orca.panels.handle('machines.cached', async ({ name }) => {
+    await ready
+    return { containers: cache.containers[name] ?? null, disk: cache.disk[name] ?? null }
+  })
+
   orca.panels.handle('machines.containers', async ({ name }) => {
     const s = await find(name)
     const out = await runOnce(sshProgram(settings.ssh), s.target, CONTAINERS_SCRIPT, 55_000)
-    return { at: Date.now(), containers: parseContainers(out) }
+    const data = { at: Date.now(), containers: parseContainers(out) }
+    cache.containers[name] = data
+    void saveCache()
+    return data
   })
 
-  orca.panels.handle('machines.disk', async ({ name }) => {
+  /** Runs the disk script once per machine at a time, stores the report and pushes it to open panels. */
+  const scanDisk = (s: Session): Promise<DiskReport> => {
+    const name = s.machine.name
+    const running = diskRuns.get(name)
+    if (running) return running
+    const run = runOnce(sshProgram(settings.ssh), s.target, DISK_SCRIPT, 110_000)
+      .then((out) => {
+        const report = parseDisk(out, Date.now())
+        cache.disk[name] = report
+        void saveCache()
+        orca.panels.post('machines.diskReport', { name, report })
+        return report
+      })
+      .finally(() => diskRuns.delete(name))
+    diskRuns.set(name, run)
+    return run
+  }
+
+  orca.panels.handle('machines.disk', async ({ name }) => scanDisk(await find(name)))
+
+  // Once a minute, rescan the disk of one online machine whose report is over an hour old, one machine at a time,
+  // so the Disk tab always has a recent report and du never runs on several machines at once.
+  const diskTimer = setInterval(() => {
+    if (diskRuns.size) return
+    const now = Date.now()
+    const due = sessions.find((s) => s.machine.state === 'online' && now - (cache.disk[s.machine.name]?.at ?? 0) > DISK_FRESH_MS)
+    if (due) scanDisk(due).catch((e) => orca.log(`disk scan ${due.machine.name}: ${e instanceof Error ? e.message : e}`))
+  }, 60_000)
+  timers.add(diskTimer)
+
+  /**
+   * Log streams for the panel's log viewer: one ssh process running `docker logs -f` per stream. Lines are batched
+   * and posted twice a second to the panel that asked, at most 400 per post, because Orca caps posts at 256 KiB and
+   * 200 per 10 seconds. A stream whose panel stops pinging is closed, so a closed panel leaves nothing running.
+   */
+  type LogStream = { child: ChildProcess; panel: string; lines: string[]; partial: string; lastPing: number; ended: boolean; error?: string }
+  const streams = new Map<string, LogStream>()
+  const LOG_LINE_MAX = 4000
+
+  const flushLogs = () => {
+    const now = Date.now()
+    for (const [id, st] of streams) {
+      if (now - st.lastPing > 45_000) st.child.kill()
+      while (st.lines.length) orca.panels.post('machines.logLines', { streamId: id, lines: st.lines.splice(0, 400) }, { panel: st.panel })
+      if (st.ended) {
+        orca.panels.post('machines.logLines', { streamId: id, lines: [], ended: true, ...(st.error ? { error: st.error } : {}) }, { panel: st.panel })
+        streams.delete(id)
+      }
+    }
+  }
+  timers.add(setInterval(flushLogs, 500))
+
+  orca.panels.handle('machines.logs.start', async ({ name, container, tail, timestamps }, context) => {
     const s = await find(name)
-    return parseDisk(await runOnce(sshProgram(settings.ssh), s.target, DISK_SCRIPT, 110_000), Date.now())
+    if (!isContainerName(container)) throw Object.assign(new Error(`Container name "${container}" has unexpected characters.`), { code: 'invalid_params' })
+    const lines = Math.min(5000, Math.max(10, Math.floor(Number(tail) || 300)))
+    const remote = `docker logs -f --tail ${lines}${timestamps ? ' --timestamps' : ''} ${container} 2>&1`
+    const child = spawn(sshProgram(settings.ssh), [...SSH_OPTIONS, ...sshTargetArgs(s.target), remote], { windowsHide: true })
+    const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+    const st: LogStream = { child, panel: context.panel.id, lines: [], partial: '', lastPing: Date.now(), ended: false }
+    streams.set(id, st)
+    logChildren.add(child)
+    let err = ''
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (chunk) => {
+      const parts = (st.partial + chunk).split('\n')
+      st.partial = parts.pop() ?? ''
+      for (const line of parts) st.lines.push(line.replace(/\r$/, '').slice(0, LOG_LINE_MAX))
+      // A runaway log never fills the worker's memory: keep the newest lines only.
+      if (st.lines.length > 5000) st.lines.splice(0, st.lines.length - 5000)
+    })
+    child.stderr.on('data', (chunk) => (err = (err + chunk).slice(-1000)))
+    child.stdin.on('error', () => {})
+    child.on('error', (e) => {
+      st.ended = true
+      st.error = e.message
+    })
+    child.on('close', (code) => {
+      logChildren.delete(child)
+      if (st.partial) st.lines.push(st.partial)
+      st.ended = true
+      if (code && code !== 143 && !st.error) st.error = lastLine(err) || `ssh exited with code ${code}.`
+    })
+    child.stdin.end('')
+    return { streamId: id }
+  })
+
+  orca.panels.handle('machines.logs.ping', async ({ streamId }) => {
+    const st = streams.get(streamId)
+    if (st) st.lastPing = Date.now()
+    return { alive: !!st && !st.ended }
+  })
+
+  orca.panels.handle('machines.logs.stop', async ({ streamId }) => {
+    streams.get(streamId)?.child.kill()
+    return { ok: true as const }
   })
 
   orca.panels.handle('machines.terminal', async ({ name, container, kind }) => {
@@ -548,4 +670,8 @@ export default function activate(orca: OrcaWorkerApi): void {
 /** Closes every ssh connection. Once a connection closes, the loop on the target hits SIGPIPE and exits. */
 export function deactivate(): void {
   for (const s of [...live]) s.stop()
+  for (const t of timers) clearInterval(t)
+  timers.clear()
+  for (const c of logChildren) c.kill()
+  logChildren.clear()
 }
