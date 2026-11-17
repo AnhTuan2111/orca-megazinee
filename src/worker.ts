@@ -319,7 +319,10 @@ export function fitTooltip(lines: string[]): string {
 /** The status bar item shows the worst machine: offline first, then over a threshold, then the first one. */
 export function statusFor(machines: Machine[]): { text: string; tone: Paint | 'neutral'; tooltip: string; visible: boolean } {
   if (!machines.length) return { text: 'Megazinee', tone: 'neutral', tooltip: 'No machines yet.', visible: false }
-  const rank = (m: Machine) => (m.state === 'offline' ? 3 : { ok: 0, warning: 1, danger: 2 }[levelOf(m)])
+  // The level decides first (offline, red, yellow, fine); within a level the highest of CPU, RAM and disk wins,
+  // so a machine at 95% disk outranks one at 82% even when both are red.
+  const peak = (m: Machine) => Math.max(0, ...[m.cpuPercent, m.memPercent, m.diskPercent].filter((v): v is number => v !== undefined))
+  const rank = (m: Machine) => (m.state === 'offline' ? 3 : { ok: 0, warning: 1, danger: 2 }[levelOf(m)]) * 1000 + (m.state === 'online' ? peak(m) : 0)
   const worst = machines.reduce((a, b) => (rank(b) > rank(a) ? b : a))
   let text: string
   if (worst.state === 'offline') text = `${worst.name} offline`

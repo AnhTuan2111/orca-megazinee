@@ -33,6 +33,15 @@ test('the status bar shows the worst machine with its level colour', () => {
   assert.equal(statusFor([]).visible, false)
 })
 
+test('within the same level, the machine with the highest number wins', () => {
+  const a = { ...base, name: 'a', diskPercent: 82 }
+  const b = { ...base, name: 'b', diskPercent: 95 }
+  assert.ok(statusFor([a, b]).text.startsWith('2/2 · b disk'))
+  const calm = { ...base, name: 'calm', diskPercent: 20, memPercent: 30, cpuPercent: 10 }
+  const busy = { ...base, name: 'busy', diskPercent: 20, memPercent: 45, cpuPercent: 10 }
+  assert.ok(statusFor([calm, busy]).text.startsWith('2/2 · busy disk'))
+})
+
 test('the tooltip stays under Orca\'s 256 character limit with many machines', () => {
   const many = Array.from({ length: 12 }, (_, i) => ({ ...base, name: `machine-${i + 1}` }))
   const tooltip = statusFor(many).tooltip
