@@ -2,7 +2,7 @@
   "manifestVersion": 2,
   "id": "megazinee",
   "name": "Megazinee",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Live CPU, RAM, disk and containers of your SSH servers, with 24 hour disk trends, in a sidebar panel and the status bar.",
   "engines": {
     "orca": ">=1.4.248"
