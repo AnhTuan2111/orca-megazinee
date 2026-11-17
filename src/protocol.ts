@@ -74,7 +74,12 @@ declare module 'orca' {
     'machines.reconnect': { output: { ok: true } }
     /** Runs docker stats and docker ps over a separate SSH connection. Slow, so only on demand. */
     'machines.containers': { input: { name: string }; output: { at: number; containers: Container[] } }
-    /** Measures where disk space goes. Slow, so only on demand. */
+    /** The last Containers and Disk results kept in storage, so a tab shows something at once. */
+    'machines.cached': {
+      input: { name: string }
+      output: { containers: { at: number; containers: Container[] } | null; disk: DiskReport | null }
+    }
+    /** Measures where disk space goes. Slow (du), so the worker also runs it in the background once an hour. */
     'machines.disk': { input: { name: string }; output: DiskReport }
     /** Opens an Orca terminal running ssh into the machine, or docker logs, docker exec of a container. */
     'machines.terminal': {
@@ -86,5 +91,7 @@ declare module 'orca' {
   interface PluginPanelEvents {
     /** Sent by the worker on every new frame or connection state change. */
     'machines.update': { machines: Machine[] }
+    /** A disk report the worker measured in the background. */
+    'machines.diskReport': { name: string; report: DiskReport }
   }
 }

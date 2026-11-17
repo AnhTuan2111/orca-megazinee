@@ -83,6 +83,20 @@ test('with no machines the snapshot is empty and the status bar item hidden', as
   await w.deactivate()
 })
 
+test('the worker hands back the stored Containers and Disk results', async () => {
+  const stored = { containers: { 'web-01': { at: 5, containers: [] } }, disk: {} }
+  const host = mockHost({
+    capabilities: ['settings:own', 'storage:own', 'notifications:show', 'workspace:read', 'terminal:send'],
+    settings: { hosts: 'web-01=127.0.0.1' },
+    storage: { cache: stored }
+  })
+  const w = await mountWorker(worker, { host })
+  const answer = await w.request('machines.cached', { name: 'web-01' })
+  assert.deepEqual(answer.containers, { at: 5, containers: [] })
+  assert.equal(answer.disk, null)
+  await w.deactivate()
+})
+
 test('an odd container name opens no terminal', async () => {
   const host = mockHost({
     capabilities: ['settings:own', 'workspace:read', 'terminal:send'],

@@ -6,7 +6,8 @@ import { containers, disk, machine, offline } from './fixtures'
 const requests = {
   'machines.snapshot': () => ({ machines: [machine, offline], hosts: 'web-01=ubuntu@10.0.0.1', sampleSeconds: 2 }),
   'machines.containers': () => containers,
-  'machines.disk': () => disk
+  'machines.disk': () => disk,
+  'machines.cached': () => ({ containers: null, disk: null })
 }
 
 export default defineCheck({
