@@ -19,8 +19,13 @@ const app = {
   log: null,
   draft: null,
   notice: null,
-  /** Gauges charge cell by cell until this time, so they animate when a view opens, not on every update. */
-  chargeUntil: 0,
+  /**
+   * Set when a machine or tab opens; the next render of the detail charges its gauges once and clears it, so later
+   * redraws (a pushed frame, a cache fill) never replay the animation.
+   */
+  chargeNext: false,
+  /** True only while that one render builds its gauges. */
+  charging: false,
   openDirs: new Set()
 }
 
@@ -83,7 +88,7 @@ function gauge(parts, cells = 10, label = '') {
     for (; used < end; used++) html += `<i class="cell on t-${p.tone}" style="--i:${used}"></i>`
   }
   for (; used < cells; used++) html += '<i class="cell"></i>'
-  const charge = Date.now() < app.chargeUntil ? ' charge' : ''
+  const charge = app.charging ? ' charge' : ''
   return `<span class="gauge${charge}" role="img" aria-label="${esc(label)}">${html}</span>`
 }
 
@@ -156,7 +161,7 @@ async function loadDisk(name, force = false) {
 
 function openTab(name, tab, first = false) {
   app.tabs[name] = tab
-  app.chargeUntil = Date.now() + 900
+  app.chargeNext = true
   saveView()
   renderDetail()
   if (tab === 'containers' && !app.containers[name]?.loading) loadContainers(name)
@@ -265,6 +270,9 @@ function renderDetail() {
     .filter(Boolean)
     .join(', ')
   const tab = app.tabs[m.name] || 'overview'
+  // Only the first render after a machine or tab opens charges the gauges.
+  app.charging = app.chargeNext && m.state === 'online' && !!m.at
+  if (app.charging) app.chargeNext = false
   let body
   if (m.state === 'offline') body = `<p class="tone t-red">Offline since ${clock(m.since)}: ${esc(m.error || 'unknown error')}</p>`
   else if (m.state === 'connecting' || !m.at) body = '<div class="skeleton"></div>'
@@ -275,6 +283,7 @@ function renderDetail() {
           .join('')}
       </div>
       <div id="tab-body">${app.log && app.log.name === m.name ? logView() : tab === 'overview' ? overview(m) : tab === 'containers' ? containersTab(m) : diskTab(m)}</div>`
+  app.charging = false
   const keepFilter = tab === 'containers' && document.activeElement?.id === 'filter'
   const keepLogQuery = document.activeElement?.id === 'log-q'
   $('detail').innerHTML = `<div class="frame" data-augmented-ui="tl-clip br-clip border">
@@ -754,7 +763,7 @@ document.addEventListener('click', (ev) => {
   if (act === 'select') {
     if (app.log) closeLog()
     app.selected = el.dataset.name
-    app.chargeUntil = Date.now() + 900
+    app.chargeNext = true
     saveView()
     renderHosts()
     const sel = current()
