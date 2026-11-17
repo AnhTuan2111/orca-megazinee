@@ -501,6 +501,12 @@ const LEVELS = [
   ['other', 'Other', 'gray']
 ]
 const ANSI = /\x1b\[[0-9;]*[A-Za-z]/g
+const LEVEL_TIPS = {
+  error: 'Show or hide lines at ERROR, FATAL, CRITICAL, or with an exception',
+  warn: 'Show or hide lines at WARN or WARNING',
+  info: 'Show or hide lines at INFO or NOTICE',
+  other: 'Show or hide lines with no level, DEBUG, TRACE, and stack trace lines'
+}
 
 /**
  * The level is the first level word in the line (ERROR, WARN, INFO, DEBUG...), so "WARN ... got error" stays a
@@ -610,31 +616,31 @@ function logView() {
     `<button class="toggle" data-act="${act}" aria-pressed="${on}" data-augmented-ui="tl-clip br-clip border" ${extra}>${label}</button>`
   return `<div class="stack logview">
     <div class="toolbar">
-      <button class="btn" data-act="log-back">${icon('close')} ${esc(l.container)}</button>
-      <button class="btn" data-act="log-term" data-augmented-ui="tl-clip br-clip border" title="Open these logs in an Orca terminal">${icon('terminal')} Terminal</button>
+      <button class="btn" data-act="log-back" title="Close the logs and go back to the containers. The log stream on the server stops.">${icon('close')} ${esc(l.container)}</button>
+      <button class="btn" data-act="log-term" data-augmented-ui="tl-clip br-clip border" title="Follow these logs in an Orca terminal tab instead (docker logs -f), for long scrolling or terminal tools.">${icon('terminal')} Terminal</button>
     </div>
     <div class="searchrow">
-      <input id="log-q" type="search" placeholder="Search logs" aria-label="Search logs" value="${esc(l.query)}" />
-      ${toggle('log-regex', l.regex, '.*', 'title="Treat the search as a regular expression"')}
+      <input id="log-q" type="search" placeholder="Search logs" aria-label="Search logs" title="Show only lines containing this text, matches lit in yellow. Not case sensitive." value="${esc(l.query)}" />
+      ${toggle('log-regex', l.regex, '.*', 'title="Read the search as a regular expression, for example timeout|refused or ^2026-11-17 14"')}
     </div>
     <div class="toolbar">
-      <span class="levels">${LEVELS.map(([k, label, t]) => `<button class="toggle t-${t}" data-act="log-level" data-level="${k}" aria-pressed="${l.levels.has(k)}" data-augmented-ui="tl-clip br-clip border">${label}</button>`).join('')}</span>
-      <span id="log-count" class="muted num"></span>
+      <span class="levels">${LEVELS.map(([k, label, t]) => `<button class="toggle t-${t}" data-act="log-level" data-level="${k}" aria-pressed="${l.levels.has(k)}" data-augmented-ui="tl-clip br-clip border" title="${LEVEL_TIPS[k]}">${label}</button>`).join('')}</span>
+      <span id="log-count" class="muted num" title="Lines shown after the filters, out of the lines loaded"></span>
     </div>
     <div class="toolbar">
       <span class="levels">
-        ${toggle('log-follow', l.follow, 'Follow')}${toggle('log-wrap', l.wrap, 'Wrap')}${toggle('log-ts', l.timestamps, 'Timestamps')}
+        ${toggle('log-follow', l.follow, 'Follow', 'title="Keep scrolling to the newest line as logs arrive. Turn off to read further up."')}${toggle('log-wrap', l.wrap, 'Wrap', 'title="Wrap long lines to the panel width. Off: one log line per row, scroll sideways."')}${toggle('log-ts', l.timestamps, 'Timestamps', 'title="Add the time Docker received each line. Reloads the logs."')}
       </span>
-      <span class="sort"><span class="muted">Lines</span>${[100, 300, 1000, 5000]
+      <span class="sort" title="How many of the last lines to load. Reloads the logs."><span class="muted">Lines</span>${[100, 300, 1000, 5000]
         .map((n) => `<button aria-pressed="${l.tail === n}" data-act="log-tail" data-tail="${n}">${n}</button>`)
         .join('')}</span>
     </div>
     <div class="toolbar">
       <span class="levels">
-        <button class="btn" data-act="log-pause" data-augmented-ui="tl-clip br-clip border">${l.paused ? 'Resume' : 'Pause'}</button>
-        <button class="btn" data-act="log-copy" data-augmented-ui="tl-clip br-clip border">${icon('logs')} Copy</button>
-        <button class="btn" data-act="log-save" data-augmented-ui="tl-clip br-clip border">Download</button>
-        <button class="btn" data-act="log-clear" data-augmented-ui="tl-clip br-clip border">Clear</button>
+        <button class="btn" data-act="log-pause" data-augmented-ui="tl-clip br-clip border" title="Hold the view still to read. New lines wait and come in on Resume.">${l.paused ? 'Resume' : 'Pause'}</button>
+        <button class="btn" data-act="log-copy" data-augmented-ui="tl-clip br-clip border" title="Copy the lines shown, after the filters, to the clipboard">${icon('logs')} Copy</button>
+        <button class="btn" data-act="log-save" data-augmented-ui="tl-clip br-clip border" title="Save the lines shown, after the filters, as a .log file">Download</button>
+        <button class="btn" data-act="log-clear" data-augmented-ui="tl-clip br-clip border" title="Empty the view to watch only new lines. The logs on the server are untouched.">Clear</button>
       </span>
     </div>
     <div id="log-box" class="logbox frame${l.wrap ? '' : ' nowrap'}" data-augmented-ui="tl-clip br-clip border" tabindex="0" aria-label="Log lines"></div>
