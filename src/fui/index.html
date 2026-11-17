@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Megazinee</title>
+    <meta name="description" content="Live health of your Linux servers: host list, gauges, containers and disk." />
+    <link rel="stylesheet" href="../../vendor/augmented-ui/augmented-ui.min.css" />
+    <link rel="stylesheet" href="./fui.css" />
+  </head>
+  <body>
+    <main id="app">
+      <header id="top"></header>
+      <section id="notice" aria-live="polite"></section>
+      <section id="editor"></section>
+      <nav id="hosts" aria-label="Machines"></nav>
+      <section id="detail"></section>
+      <noscript><p class="muted">Megazinee needs scripting to talk to its worker.</p></noscript>
+    </main>
+    <script type="module" src="./fui.js"></script>
+  </body>
+</html>
