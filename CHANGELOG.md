@@ -2,6 +2,12 @@
 
 ## 0.3.0
 
+- A second panel, Megazinee FUI, with the same features drawn as a sci-fi HUD: cut-corner frames from augmented-ui
+  (BSD-2-Clause, in `vendor/augmented-ui`), glowing slanted gauge cells that charge once when a view opens, aligned
+  host numbers, cut chart columns.
+- The FUI panel reads container logs in place: follow, search with highlighted matches and an optional regex, level
+  filters (error, warn, info, other), wrap, timestamps, 100 to 5000 lines, pause, copy, download, and tooltips on
+  every control. The worker streams `docker logs -f` and stops when the view closes.
 - Containers and Disk open at once with the last results, kept in the plugin's storage. Containers always measure
   again in the background; Disk keeps a report for an hour, and the worker rescans one machine a minute when its
   report is older, so du rarely runs while you wait. Refresh forces a new scan.
