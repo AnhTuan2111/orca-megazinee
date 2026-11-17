@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- One panel: the HUD panel from 0.3.0 is now Megazinee, and the panel built from Orca's own controls is gone, with
+  its tests and sample data. Settings, history and cache stay, since they belong to the plugin, not the panel.
+- In a narrow sidebar a machine's CPU, RAM and disk drop under its name instead of being cut off.
+
 ## 0.3.0
 
 - A second panel, Megazinee FUI, with the same features drawn as a sci-fi HUD: cut-corner frames from augmented-ui

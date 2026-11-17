@@ -10,11 +10,9 @@ orca plugin install AnhTuan2111/orca-megazinee
 
 Notifications when a machine goes offline, disk or RAM passes 80%, CPU stays above 80%, or a container fails.
 
-## Two panels
+## Logs in the panel
 
-**Megazinee** uses Orca's own controls. **Megazinee FUI** draws the same features as a sci-fi HUD with cut-corner
-frames and glowing gauges, and reads container logs in place: follow, search with highlights, level filters, pause,
-copy, download.
+Pick a container and press Logs: follow, search with highlights, level filters, pause, copy, download.
 
 ## Four colours
 

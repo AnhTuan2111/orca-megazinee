@@ -208,11 +208,13 @@ button {
   gap: var(--s1);
 }
 
+/* In a narrow sidebar the numbers drop under the name instead of being cut off at the edge. */
 .host {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--s2);
+  gap: var(--s1) var(--s2);
   width: 100%;
   text-align: left;
 }
@@ -227,6 +229,7 @@ button {
 .host .stats {
   display: grid;
   grid-template-columns: repeat(3, 64px);
+  margin-left: auto;
   font-size: 12px;
   white-space: nowrap;
 }

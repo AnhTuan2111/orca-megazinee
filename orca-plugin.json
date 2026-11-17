@@ -2,7 +2,7 @@
   "manifestVersion": 2,
   "id": "megazinee",
   "name": "Megazinee",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Live CPU, RAM, disk and containers of your SSH servers, with 24 hour disk trends, in a sidebar panel and the status bar.",
   "engines": {
     "orca": ">=1.4.248"
@@ -15,13 +15,6 @@
       {
         "id": "megazinee",
         "title": "Megazinee",
-        "icon": "gauge",
-        "entry": "src/panel.tsx",
-        "ui": "components"
-      },
-      {
-        "id": "megazinee-fui",
-        "title": "Megazinee FUI",
         "icon": "zap",
         "entry": "src/fui/index.html",
         "ui": "html"
