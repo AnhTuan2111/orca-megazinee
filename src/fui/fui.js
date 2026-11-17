@@ -238,13 +238,13 @@ function renderHosts() {
   $('hosts').innerHTML = list
     .map((m) => {
       let stats
-      if (m.state === 'offline') stats = `<span class="tone t-red">offline since ${clock(m.since)}</span>`
-      else if (m.state === 'connecting' || !m.at) stats = '<span class="muted">connecting</span>'
+      if (m.state === 'offline') stats = `<span class="whole tone t-red">offline since ${clock(m.since)}</span>`
+      else if (m.state === 'connecting' || !m.at) stats = '<span class="whole muted">connecting</span>'
       else
         stats = ['CPU', 'RAM', 'Disk']
           .map((k, i) => {
             const v = [m.cpuPercent, m.memPercent, m.diskPercent][i] ?? 0
-            return `<span><span class="muted">${k}</span> <span class="num tone t-${tone(v)}">${num(v, 0)}%</span></span>`
+            return `<span class="stat"><span class="muted">${k}</span><span class="num tone t-${tone(v)}">${num(v, 0)}%</span></span>`
           })
           .join('')
       return `<button class="host frame${m === picked ? ' lit' : ''}" data-augmented-ui="tl-clip br-clip border" data-act="select" data-name="${esc(m.name)}">
@@ -298,7 +298,7 @@ function chart(title, summary, values, lo, hi, from, to) {
     .map((v) => {
       if (v === null) return '<i class="col empty"></i>'
       const h = Math.max(3, Math.round(((Math.min(Math.max(v, lo), hi) - lo) / (hi - lo || 1)) * 86))
-      return `<i class="col t-${tone(v)}" style="height:${h}px"></i>`
+      return `<i class="col t-${tone(v)}" data-augmented-ui="tl-clip border" style="height:${h}px"></i>`
     })
     .join('')
   return `<div>

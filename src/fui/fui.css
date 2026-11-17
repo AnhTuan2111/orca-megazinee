@@ -43,6 +43,12 @@
 html,
 body {
   overflow-x: clip;
+  /* The panel still scrolls with the wheel and keys; it just draws no scrollbar in the narrow sidebar. */
+  scrollbar-width: none;
+}
+
+::-webkit-scrollbar {
+  display: none;
 }
 
 body {
@@ -217,11 +223,24 @@ button {
   min-width: 0;
 }
 
+/* Three fixed columns with right-aligned numbers, so CPU, RAM and Disk line up from row to row. */
 .host .stats {
-  display: flex;
-  gap: var(--s2);
+  display: grid;
+  grid-template-columns: repeat(3, 64px);
   font-size: 12px;
   white-space: nowrap;
+}
+
+.host .stats > .whole {
+  grid-column: 1 / -1;
+  justify-self: end;
+}
+
+.host .stat {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s1);
+  padding-left: var(--s2);
 }
 
 /* Detail */
@@ -363,11 +382,14 @@ button {
   padding: 4px;
 }
 
+/* Columns get the same cut corner as every frame, drawn by augmented-ui. */
 .col {
+  --aug-tl: 4px;
+  --aug-border-all: 1px;
+  --aug-border-bg: var(--tone);
   flex: 1 1 0;
   min-width: 2px;
   background: color-mix(in srgb, var(--tone) 18%, transparent);
-  border: 1px solid var(--tone);
 }
 
 .col.empty {
