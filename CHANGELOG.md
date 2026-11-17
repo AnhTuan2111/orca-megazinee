@@ -2,26 +2,20 @@
 
 ## 0.4.0
 
-- One panel: the HUD panel from 0.3.0 is now Megazinee, and the panel built from Orca's own controls is gone, with
-  its tests and sample data. Settings, history and cache stay, since they belong to the plugin, not the panel.
-- In a narrow sidebar a machine's CPU, RAM and disk drop under its name instead of being cut off.
-
-## 0.3.0
-
-- A second panel, Megazinee FUI, with the same features drawn as a sci-fi HUD: cut-corner frames from augmented-ui
-  (BSD-2-Clause, in `vendor/augmented-ui`), glowing slanted gauge cells that charge once when a view opens, aligned
-  host numbers, cut chart columns.
-- The FUI panel reads container logs in place: follow, search with highlighted matches and an optional regex, level
-  filters (error, warn, info, other), wrap, timestamps, 100 to 5000 lines, pause, copy, download, and tooltips on
-  every control. The worker streams `docker logs -f` and stops when the view closes.
-- Containers and Disk open at once with the last results, kept in the plugin's storage. Containers always measure
-  again in the background; Disk keeps a report for an hour, and the worker rescans one machine a minute when its
-  report is older, so du rarely runs while you wait. Refresh forces a new scan.
-- "Can be freed" counts only images no container uses and build cache. Docker's own reclaimable figure for images
-  is wrong with the containerd image store (98% while every image had a container), and volumes no container uses
-  can still hold data, so they are listed apart.
-- A container's CPU is a share of the whole machine, like the machine's own gauge: docker stats counts one core as
-  100%, so kafka on two of sixteen cores showed 193% instead of 12%.
+- The panel is drawn as a sci-fi HUD: cut corners from augmented-ui (BSD-2-Clause, in `vendor/augmented-ui`),
+  slanted gauge cells that light up in the level colour and fill one by one when a server or tab opens. It replaces
+  the panel built from Orca's own controls.
+- Container logs open inside the panel: follow, search with highlighted matches or a regex, filter by level, wrap,
+  timestamps, 100 to 5000 lines, pause, copy, download. The worker runs `docker logs -f` and stops it when the view
+  closes.
+- Containers and Disk open at once with the last results, kept in the plugin's storage. Containers are measured
+  again each time; disk is rescanned in the background once an hour per server, one server at a time.
+- "Can be freed" counts only images no container uses and build cache. `docker system df` reports nearly every
+  image as reclaimable on servers using the containerd image store, and unused volumes can still hold data, so
+  they are listed apart.
+- Container CPU is a share of the whole server. `docker stats` counts one core as 100%, so a container busy on two
+  of sixteen cores showed 193%.
+- In a narrow sidebar a server's numbers move under its name instead of being cut off.
 
 ## 0.2.1
 
