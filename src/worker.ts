@@ -16,6 +16,7 @@ import {
   parseContainers,
   parseDisk,
   parseHosts,
+  sshTargetArgs,
   streamScript,
   type Counters
 } from './parse'
@@ -168,7 +169,7 @@ class Session {
     this.buffer = ''
     this.stderr = ''
     this.counters = {}
-    const child = spawn(sshProgram(this.settings.ssh), [...SSH_OPTIONS, this.target, 'sh', '-s'], { windowsHide: true })
+    const child = spawn(sshProgram(this.settings.ssh), [...SSH_OPTIONS, ...sshTargetArgs(this.target), 'sh', '-s'], { windowsHide: true })
     this.child = child
     child.stdout.setEncoding('utf8')
     child.stderr.setEncoding('utf8')
@@ -249,7 +250,7 @@ class Session {
 /** Runs a script once on the target over its own SSH connection and returns stdout. */
 function runOnce(ssh: string, target: string, script: string, timeoutMs: number): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(ssh, [...SSH_OPTIONS, target, 'sh', '-s'], { windowsHide: true })
+    const child = spawn(ssh, [...SSH_OPTIONS, ...sshTargetArgs(target), 'sh', '-s'], { windowsHide: true })
     child.stdout.setEncoding('utf8')
     child.stderr.setEncoding('utf8')
     let out = ''
@@ -503,7 +504,7 @@ export default function activate(orca: OrcaWorkerApi): void {
     if (container !== undefined && !isContainerName(container)) {
       throw Object.assign(new Error(`Container name "${container}" has unexpected characters.`), { code: 'invalid_params' })
     }
-    let command = `ssh -t ${s.target}`
+    let command = `ssh -t ${sshTargetArgs(s.target).join(' ')}`
     let title = s.machine.name
     if (container && kind === 'logs') {
       command += ` docker logs -f --tail 200 ${container}`

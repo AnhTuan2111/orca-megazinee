@@ -844,7 +844,7 @@ function HostsEditor() {
         <IconButton
           icon="info"
           label="How to list machines"
-          tooltip="One machine per line as name=ssh-target, for example web-01=ubuntu@10.0.0.1. The target can also be a Host from ~/.ssh/config. The machine must accept your SSH key without a password prompt."
+          tooltip="One machine per line as name=ssh-target, for example web-01=ubuntu@10.0.0.1, or ubuntu@10.0.0.1:2222 for another port. The target can also be a Host from ~/.ssh/config. The machine must accept your SSH key without a password prompt."
           variant="ghost"
           size="sm"
         />

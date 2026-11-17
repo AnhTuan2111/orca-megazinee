@@ -20,6 +20,7 @@ Press the gear on the panel, add a line, press Save. Key login only.
 
 ```text
 web-01=ubuntu@10.0.0.1
+monitor=admin@10.0.0.2:2222
 ```
 
 On Windows the plugin uses Git for Windows' `ssh.exe`.
